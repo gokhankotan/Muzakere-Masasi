@@ -23,10 +23,6 @@ export default function Lobby({ question, onJoin, participantsCount, lang = 'tr'
     e.preventDefault();
     if (!nickname.trim()) return setError(lang === 'tr' ? 'Lütfen bir rumuz girin.' : 'Please enter a nickname.');
     if (!sessionCode.trim()) return setError(lang === 'tr' ? 'Lütfen oturum kodunu girin.' : 'Please enter a table code.');
-    if (justification.trim().length > 0 && justification.trim().length < 15) {
-      return setError(t('lobbyValidationMinJustify', lang));
-    }
-
     setError('');
     const upperCode = sessionCode.trim().toUpperCase();
 
@@ -55,7 +51,7 @@ export default function Lobby({ question, onJoin, participantsCount, lang = 'tr'
       onJoin({
         sessionCode: upperCode,
         nickname: nickname.trim(),
-        justification: justification.trim(),
+        justification: '',
         token: data.accessToken
       });
     } catch (err) {
@@ -266,26 +262,6 @@ export default function Lobby({ question, onJoin, participantsCount, lang = 'tr'
                 maxLength={20}
                 required
               />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">
-                <MessageSquareCode size={14} style={{ marginRight: '0.25rem', verticalAlign: 'middle' }} />
-                {t('lobbyFormJustify', lang)} {lang === 'tr' ? '(İsteğe Bağlı)' : '(Optional)'}
-              </label>
-              <textarea 
-                className="form-textarea" 
-                placeholder={t('lobbyFormJustifyPlaceholder', lang)} 
-                value={justification}
-                onChange={(e) => setJustification(e.target.value)}
-                rows={3}
-                maxLength={200}
-              ></textarea>
-              {justification.length > 0 && (
-                <span style={{ fontSize: '0.75rem', color: justification.length >= 15 ? 'var(--color-agree)' : 'var(--color-warning)', alignSelf: 'flex-end' }}>
-                  {justification.length} / 200 {lang === 'tr' ? 'karakter (en az 15)' : 'characters (min 15)'}
-                </span>
-              )}
             </div>
 
             {joinVisibility === 'PASSWORD_PROTECTED' && (
