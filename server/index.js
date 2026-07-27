@@ -76,6 +76,9 @@ app.get('/api/admin/sessions-overview', authenticateAdmin, async (req, res) => {
     let overview = [];
     if (db.isPrismaActive) {
       const dbSessions = await db.prisma.session.findMany({
+        where: {
+          status: { not: 'archived' }
+        },
         include: {
           opinions: true,
           participants: true
@@ -101,6 +104,7 @@ app.get('/api/admin/sessions-overview', authenticateAdmin, async (req, res) => {
       });
     } else {
       overview = Array.from(db.sessions.values())
+        .filter(s => s.status !== 'archived')
         .map(s => ({
           code: s.code,
           title: s.title,
@@ -247,6 +251,10 @@ app.post('/api/sessions/:code/join', passwordRateLimiter, async (req, res) => {
     const session = await db.getSessionByCode(upperCode);
     if (!session) {
       return res.status(404).json({ success: false, message: 'Oturum bulunamadı.' });
+    }
+
+    if (session.status === 'archived') {
+      return res.status(403).json({ success: false, message: 'Bu oturum artık aktif değil.' });
     }
 
     if (session.visibility === 'PUBLIC') {
@@ -958,11 +966,13 @@ io.on('connection', (socket) => {
   socket.on('register-participant', ({ sessionCode, nickname, justification }, callback) => {
     const code = sessionCode ? sessionCode.toUpperCase() : 'DEFAULT';
     try {
+      const session = db.getSessionSync(code);
+      if (session && session.status === 'archived') {
+        return callback({ success: false, message: 'Bu oturum artık aktif değil.' });
+      }
+
       const participant = db.addParticipant(code, nickname, justification);
       callback({ success: true, participantId: participant.id, nickname: participant.nickname });
-      
-      const session = db.getSessionSync(code);
-      
       // Moderatörlere bildir
       io.to(`moderator-${code}`).emit('participant-joined', {
         id: participant.id,

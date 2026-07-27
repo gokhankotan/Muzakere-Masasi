@@ -771,47 +771,27 @@ class Database {
       bridges: [],
       polarisability: 0
     };
-
-    // Varsayılan ifadeleri tekrar yükle
-    const defaultStatements = [
-      { text: 'Motorlu araç şeritleri daraltılarak korumalı bisiklet ve scooter yolları genişletilmelidir.', author: 'Arda (Bisiklet Derneği)', approved: true },
-      { text: 'Esnafın mal indirip bindirmesi ve ticaretin aksamaması için caddedeki otopark alanları korunmalıdır.', author: 'Melis (Esnaf Odası)', approved: true },
-      { text: "E-scooter'lar kaldırımlarda yürüyen yayalara büyük tehlike oluşturuyor, kaldırımlarda kullanımı tamamen yasaklanmalı.", author: 'Can (Yaya Hakları)', approved: true },
-      { text: 'Şehir merkezine özel araçla girişler Londra modeli gibi ücretli ve kısıtlı hale getirilmelidir.', author: 'Selin (Şehir Plancısı)', approved: true },
-      { text: 'Bisiklet yolları yapmak yerine yaya kaldırımları genişletilmeli ve ağaçlandırılmalıdır.', author: 'Ahmet (Mahalle Sakini)', approved: true },
-      { text: "Scooter'ların azami hız sınırı saatte 15 km'ye düşürülmeli ve kask kullanımı zorunlu olmalıdır.", author: 'Derya (Güvenlik Uzmanı)', approved: true },
-      { text: 'Araç hızı şehir içi tüm ara sokaklarda saatte 30 km ile sınırlandırılmalıdır.', author: 'Emre (Trafik Mühendisi)', approved: true },
-      { text: 'Toplu taşıma hatları (metro, metrobüs) 24 saat kesintisiz ve sübvanse edilerek çok ucuz hale getirilmelidir.', author: 'Gamze (Öğrenci)', approved: true }
-    ];
-
-    defaultStatements.forEach(s => {
-      const statement = {
-        id: `s-${this.nextStatementId++}`,
-        text: s.text,
-        author: s.author,
-        timestamp: new Date(),
-        approved: s.approved
-      };
-      session.statements.push(statement);
-    });
+    session.polarizationHistory = [];
+    session.status = 'archived';
 
     if (this.isPrismaActive) {
-      // DB'deki katılımcıları ve görüşleri temizle, varsayılan görüşleri tekrar ekle
       Promise.all([
         this.prisma.participant.deleteMany({ where: { sessionId: session.id } }),
-        this.prisma.opinion.deleteMany({ where: { sessionId: session.id } })
-      ]).then(() => {
-        return this.prisma.opinion.createMany({
-          data: session.statements.map(s => ({
-            id: s.id,
-            text: s.text,
-            author: s.author,
-            status: 'APPROVED',
-            timestamp: s.timestamp,
-            sessionId: session.id
-          }))
-        });
-      }).catch(err => {
+        this.prisma.opinion.deleteMany({ where: { sessionId: session.id } }),
+        this.prisma.session.update({
+          where: { id: session.id },
+          data: {
+            status: 'archived',
+            analysis: {
+              points: [],
+              camps: [],
+              bridges: [],
+              polarisability: 0
+            },
+            polarizationHistory: []
+          }
+        })
+      ]).catch(err => {
         console.error('Session reset DB hatası:', err.message);
       });
     }
