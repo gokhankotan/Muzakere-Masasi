@@ -195,9 +195,66 @@ export default function App() {
       }
     });
 
+    // Rota Kontrolü: Doğrudan /live veya /live/:code ile girilmiş mi?
+    const path = window.location.pathname;
+    const isLivePath = path === '/live' || path.startsWith('/live/');
+    let matchedCode = null;
+    if (isLivePath) {
+      const parts = path.split('/');
+      matchedCode = parts[2] ? parts[2].toUpperCase() : 'DEFAULT';
+    }
+
     // LocalStorage: Daha önceden oturum açılmış mı?
     const savedParticipant = localStorage.getItem('muzakere_participant');
-    if (savedParticipant) {
+    const adminToken = localStorage.getItem('admin_token');
+
+    if (isLivePath) {
+      let isAuthorized = false;
+      let targetCode = matchedCode || 'DEFAULT';
+      let resolvedToken = null;
+
+      if (adminToken) {
+        isAuthorized = true;
+        resolvedToken = adminToken;
+      } else {
+        const modToken = localStorage.getItem(`moderator_token_${targetCode}`);
+        const sessionToken = localStorage.getItem(`session_token_${targetCode}`);
+        if (modToken || sessionToken) {
+          isAuthorized = true;
+          resolvedToken = modToken || sessionToken;
+        } else if (savedParticipant) {
+          try {
+            const parsed = JSON.parse(savedParticipant);
+            if ((parsed.sessionCode || 'DEFAULT').toUpperCase() === targetCode) {
+              isAuthorized = true;
+              resolvedToken = localStorage.getItem(`session_token_${targetCode}`);
+            }
+          } catch (e) {
+            // ignore
+          }
+        }
+      }
+
+      if (isAuthorized) {
+        if (savedParticipant) {
+          try {
+            setParticipant(JSON.parse(savedParticipant));
+          } catch (e) {}
+        }
+        setActiveSessionCode(targetCode);
+        const modToken = localStorage.getItem(`moderator_token_${targetCode}`);
+        if (modToken) {
+          setIsModerator(true);
+          socket.emit('admin-join', { sessionCode: targetCode, token: adminToken || modToken });
+        }
+        socket.emit('join-session', { sessionCode: targetCode, token: resolvedToken });
+        setRole('livescreen');
+      } else {
+        // Yetkisiz veya giriş yapılmamış, lobiye at ve URL'i temizle
+        setRole('lobby');
+        window.history.replaceState({}, '', '/');
+      }
+    } else if (savedParticipant) {
       try {
         const parsed = JSON.parse(savedParticipant);
         setParticipant(parsed);
@@ -209,13 +266,13 @@ export default function App() {
           setIsModerator(true);
           socket.emit('admin-join', { 
             sessionCode: parsed.sessionCode || 'DEFAULT', 
-            token: localStorage.getItem('admin_token') || modToken 
+            token: adminToken || modToken 
           });
         }
 
         const savedToken = localStorage.getItem(`session_token_${parsed.sessionCode || 'DEFAULT'}`) ||
                            modToken ||
-                           localStorage.getItem('admin_token');
+                           adminToken;
         socket.emit('join-session', { sessionCode: parsed.sessionCode || 'DEFAULT', token: savedToken });
         setRole('participant');
       } catch {
@@ -227,6 +284,30 @@ export default function App() {
       socket.disconnect();
     };
   }, []);
+
+  useEffect(() => {
+    // Keep URL in sync with role state
+    const path = window.location.pathname;
+    if (role === 'livescreen') {
+      const targetUrl = `/live/${activeSessionCode}`;
+      if (path !== targetUrl) {
+        window.history.pushState({}, '', targetUrl);
+      }
+    } else if (role === 'report') {
+      const targetUrl = `/report/${activeSessionCode}`;
+      if (path !== targetUrl) {
+        window.history.pushState({}, '', targetUrl);
+      }
+    } else if (role === 'admin') {
+      if (path !== '/admin') {
+        window.history.pushState({}, '', '/admin');
+      }
+    } else if (['lobby', 'participant'].includes(role)) {
+      if (path !== '/' && path !== '') {
+        window.history.pushState({}, '', '/');
+      }
+    }
+  }, [role, activeSessionCode]);
 
   // Katılımcı olarak masaya oturma
   const handleJoinSession = ({ sessionCode, nickname, justification, isModerator: isModFlag, token }) => {
@@ -462,12 +543,14 @@ export default function App() {
             <Users size={16} /> {t('navTable', lang)}
           </button>
           
-          <button 
-            onClick={() => setRole('livescreen')} 
-            className={`nav-btn ${role === 'livescreen' ? 'active' : ''}`}
-          >
-            <Play size={16} /> {t('navLive', lang)}
-          </button>
+          {(participant || isAdminAuthenticated || isModerator) && (
+            <button 
+              onClick={() => setRole('livescreen')} 
+              className={`nav-btn ${role === 'livescreen' ? 'active' : ''}`}
+            >
+              <Play size={16} /> {t('navLive', lang)}
+            </button>
+          )}
 
           {/* Rapor Butonları (Admin veya Moderatör için) */}
           {(isAdminAuthenticated || isModerator) && (
