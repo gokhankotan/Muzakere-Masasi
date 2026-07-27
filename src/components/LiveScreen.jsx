@@ -137,16 +137,15 @@ export default function LiveScreen({ question, analysis, stats, status = 'active
 
                 {/* Eksen Etiketleri */}
                 {analysis?.axisLabels && (
-                  <g style={{ opacity: 0.85 }}>
+                  <g style={{ opacity: 0.9 }}>
                     {/* X Eksen Etiketi (Sağ uçta) */}
                     <text
                       x="390"
                       y="190"
-                      fill="#e2e8f0"
+                      fill="var(--text-main)"
                       fontSize="9"
                       fontWeight="700"
                       textAnchor="end"
-                      style={{ textShadow: '0 1px 4px #000' }}
                     >
                       {analysis.axisLabels.x} →
                     </text>
@@ -154,11 +153,10 @@ export default function LiveScreen({ question, analysis, stats, status = 'active
                     <text
                       x="215"
                       y="18"
-                      fill="#e2e8f0"
+                      fill="var(--text-main)"
                       fontSize="9"
                       fontWeight="700"
                       textAnchor="start"
-                      style={{ textShadow: '0 1px 4px #000' }}
                     >
                       {analysis.axisLabels.y} ↑
                     </text>

@@ -99,30 +99,30 @@ export default function Participant({
 
         {/* === MODERATÖR KONTROL PANELİ === */}
         {isModerator && (
-          <div className="glass-panel" style={{ border: '1px solid rgba(168, 85, 247, 0.4)', background: 'rgba(88, 28, 135, 0.15)' }}>
+          <div className="glass-panel" style={{ border: '1px solid var(--border-light)', background: 'var(--bg-card-hover)' }}>
             <div 
               style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', marginBottom: modPanelOpen ? '1.25rem' : 0 }}
               onClick={() => setModPanelOpen(!modPanelOpen)}
             >
-              <h2 style={{ fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#c084fc' }}>
+              <h2 style={{ fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-primary)' }}>
                 <ShieldCheck size={18} />
                 Moderatör Kontrol Paneli
-                <span style={{ background: 'rgba(168,85,247,0.2)', border: '1px solid rgba(168,85,247,0.4)', borderRadius: '999px', padding: '0.1rem 0.6rem', fontSize: '0.7rem', color: '#c084fc' }}>
+                <span style={{ background: 'rgba(29, 78, 216, 0.1)', border: '1px solid rgba(29, 78, 216, 0.2)', borderRadius: '999px', padding: '0.1rem 0.6rem', fontSize: '0.7rem', color: 'var(--color-secondary)' }}>
                   {(moderationQueue || []).length} bekleyen
                 </span>
               </h2>
-              {modPanelOpen ? <ChevronUp size={16} color="#c084fc" /> : <ChevronDown size={16} color="#c084fc" />}
+              {modPanelOpen ? <ChevronUp size={16} color="var(--color-secondary)" /> : <ChevronDown size={16} color="var(--color-secondary)" />}
             </div>
 
             {modPanelOpen && (
               <>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.25rem', paddingBottom: '0.75rem', borderBottom: '1px dashed rgba(168, 85, 247, 0.3)' }}>
-                  <span><strong>{lang === 'tr' ? 'Oturum Kodu:' : 'Session Code:'}</strong> <code style={{ fontSize: '0.9rem', color: '#fff', background: 'rgba(0,0,0,0.3)', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>{sessionCode}</code></span>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.25rem', paddingBottom: '0.75rem', borderBottom: '1px dashed var(--border-light)' }}>
+                  <span><strong>{lang === 'tr' ? 'Oturum Kodu:' : 'Session Code:'}</strong> <code style={{ fontSize: '0.9rem', color: 'var(--text-main)', background: 'var(--bg-main)', border: '1px solid var(--border-light)', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>{sessionCode}</code></span>
                   {visibility === 'PASSWORD_PROTECTED' && passwordText && (
-                    <span><strong>{lang === 'tr' ? 'Masa Şifresi:' : 'Table Password:'}</strong> <code style={{ fontSize: '0.9rem', color: '#c084fc', background: 'rgba(0,0,0,0.3)', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>{passwordText}</code></span>
+                    <span><strong>{lang === 'tr' ? 'Masa Şifresi:' : 'Table Password:'}</strong> <code style={{ fontSize: '0.9rem', color: 'var(--color-secondary)', background: 'var(--bg-main)', border: '1px solid var(--border-light)', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>{passwordText}</code></span>
                   )}
                   {visibility === 'PUBLIC' && (
-                    <span><strong>{lang === 'tr' ? 'Masa Şifresi:' : 'Table Password:'}</strong> <code style={{ fontSize: '0.9rem', color: 'var(--color-agree)', background: 'rgba(0,0,0,0.3)', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>{lang === 'tr' ? 'Herkese Açık' : 'Public'}</code></span>
+                    <span><strong>{lang === 'tr' ? 'Masa Şifresi:' : 'Table Password:'}</strong> <code style={{ fontSize: '0.9rem', color: 'var(--color-agree)', background: 'var(--bg-main)', border: '1px solid var(--border-light)', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>{lang === 'tr' ? 'Herkese Açık' : 'Public'}</code></span>
                   )}
                 </div>
 
@@ -177,13 +177,13 @@ export default function Participant({
                   </p>
 
                   {visibility === 'PASSWORD_PROTECTED' && passwordText && (
-                    <div style={{ background: 'rgba(192, 132, 252, 0.1)', border: '1px solid #c084fc', padding: '0.75rem', borderRadius: 'var(--radius-md)', fontSize: '0.85rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span><strong>{lang === 'tr' ? 'Aktif Masa Şifresi:' : 'Active Table Password:'}</strong> <code style={{ fontSize: '1rem', color: '#c084fc', background: 'rgba(0,0,0,0.2)', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>{passwordText}</code></span>
+                    <div style={{ background: 'var(--color-primary-glow)', border: '1px solid var(--border-light)', padding: '0.75rem', borderRadius: 'var(--radius-md)', fontSize: '0.85rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span><strong>{lang === 'tr' ? 'Aktif Masa Şifresi:' : 'Active Table Password:'}</strong> <code style={{ fontSize: '1rem', color: 'var(--color-primary)', background: 'var(--bg-main)', border: '1px solid var(--border-light)', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>{passwordText}</code></span>
                     </div>
                   )}
 
                   {accessMsg && (
-                    <div style={{ background: 'rgba(51,255,87,0.1)', border: '1px solid var(--color-agree)', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-md)', fontSize: '0.8rem', marginBottom: '0.75rem' }}>
+                    <div style={{ background: 'rgba(21, 115, 71, 0.1)', border: '1px solid var(--color-agree)', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-md)', fontSize: '0.8rem', marginBottom: '0.75rem' }}>
                       {accessMsg}
                     </div>
                   )}
@@ -198,7 +198,7 @@ export default function Participant({
                       className="form-input" 
                       value={accessVisibility}
                       onChange={(e) => setAccessVisibility(e.target.value)}
-                      style={{ background: '#110c22', color: '#fff', fontSize: '0.85rem', padding: '0.5rem' }}
+                      style={{ background: 'var(--bg-card)', color: 'var(--text-main)', fontSize: '0.85rem', padding: '0.5rem' }}
                     >
                       <option value="PUBLIC">🌐 Herkese Açık (Şifresiz)</option>
                       <option value="PASSWORD_PROTECTED">🔒 Şifre Korumalı</option>
@@ -215,7 +215,7 @@ export default function Participant({
                       />
                     )}
 
-                    <button type="submit" className="btn btn-secondary" style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem', borderColor: '#c084fc', color: '#c084fc' }}>
+                    <button type="submit" className="btn btn-secondary" style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem', borderColor: 'var(--color-secondary)', color: 'var(--color-secondary)' }}>
                       Erişim Ayarlarını Kaydet
                     </button>
                   </form>

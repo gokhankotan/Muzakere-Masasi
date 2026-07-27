@@ -1,41 +1,39 @@
-/* Müzakere Masası - Tasarım Sistemi & Global CSS */
-
 :root {
-  /* Renk Paleti - Premium Karanlık Tema */
-  --bg-main: #0a0516; /* Çok koyu morumsu siyah */
-  --bg-card: rgba(18, 11, 35, 0.65); /* Cam moru */
-  --bg-card-hover: rgba(26, 17, 48, 0.85);
+  /* Renk Paleti - Resmi Kamu Kurumu Teması */
+  --bg-main: #f1f5f9; /* Açık gri arkaplan */
+  --bg-card: #ffffff; /* Düz beyaz kart arkaplanı */
+  --bg-card-hover: #f8fafc;
   
-  --border-light: rgba(255, 255, 255, 0.08);
-  --border-glow: rgba(168, 85, 247, 0.2);
-  --border-glow-active: rgba(168, 85, 247, 0.5);
+  --border-light: #cbd5e1; /* Net gri kenarlık */
+  --border-glow: rgba(12, 35, 64, 0.15);
+  --border-glow-active: rgba(12, 35, 64, 0.4);
 
-  --color-primary: #a855f7; /* Canlı Mor */
-  --color-primary-glow: rgba(168, 85, 247, 0.15);
-  --color-secondary: #06b6d4; /* Turkuaz/Cyan */
-  --color-secondary-glow: rgba(6, 182, 212, 0.15);
+  --color-primary: #0c2340; /* Koyu Lacivert */
+  --color-primary-glow: rgba(12, 35, 64, 0.08);
+  --color-secondary: #1d4ed8; /* Koyu Mavi */
+  --color-secondary-glow: rgba(29, 78, 216, 0.08);
   
-  --color-agree: #10b981; /* Zümrüt Yeşili */
-  --color-agree-glow: rgba(16, 185, 129, 0.15);
-  --color-disagree: #ef4444; /* Parlak Kırmızı */
-  --color-disagree-glow: rgba(239, 68, 68, 0.15);
-  --color-pass: #6b7280; /* Gri */
-  --color-pass-glow: rgba(107, 114, 128, 0.15);
-  --color-warning: #f59e0b; /* Kehribar */
+  --color-agree: #157347; /* Güven Veren Koyu Yeşil */
+  --color-agree-glow: rgba(21, 115, 71, 0.08);
+  --color-disagree: #bb2d3b; /* Ciddi Koyu Kırmızı */
+  --color-disagree-glow: rgba(187, 45, 59, 0.08);
+  --color-pass: #6c757d; /* Nötr Gri */
+  --color-pass-glow: rgba(108, 117, 125, 0.08);
+  --color-warning: #d39e00; /* Koyu Sarı */
 
-  --text-main: #f3f4f6; /* Kırık beyaz */
-  --text-muted: #9ca3af; /* Açık gri */
-  --text-dark: #1f2937;
+  --text-main: #1e293b; /* Koyu füme yazı */
+  --text-muted: #475569; /* Orta ton gri */
+  --text-dark: #0f172a;
 
   /* Font Ailesi */
-  --font-title: 'Outfit', sans-serif;
-  --font-body: 'Inter', sans-serif;
+  --font-title: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 
-  /* Gölgeler ve Bulanıklık */
-  --shadow-premium: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-  --blur-amount: 16px;
-  --radius-lg: 16px;
-  --radius-md: 10px;
+  /* Gölgeler ve Köşeler */
+  --shadow-premium: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  --blur-amount: 0px; /* Resmi sitelerde cam efekti kullanılmaz */
+  --radius-lg: 6px; /* Daha köşeli, kurumsal görünüm */
+  --radius-md: 4px;
 }
 
 /* Sıfırlamalar */
@@ -47,10 +45,6 @@
 
 body {
   background-color: var(--bg-main);
-  background-image: 
-    radial-gradient(at 10% 20%, rgba(124, 58, 237, 0.15) 0px, transparent 50%),
-    radial-gradient(at 90% 80%, rgba(6, 182, 212, 0.1) 0px, transparent 50%),
-    radial-gradient(at 50% 50%, rgba(15, 7, 30, 1) 0px, transparent 100%);
   color: var(--text-main);
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
@@ -60,8 +54,9 @@ body {
 
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-title);
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  font-weight: 700;
+  color: var(--color-primary);
+  letter-spacing: -0.01em;
 }
 
 /* Ana Konteyner */
@@ -71,18 +66,18 @@ h1, h2, h3, h4, h5, h6 {
   min-height: 100vh;
 }
 
-/* Header */
+/* Header - Resmi Devlet Portalı Laciverti */
 .app-header {
-  backdrop-filter: blur(var(--blur-amount));
-  background: rgba(10, 5, 22, 0.8);
-  border-bottom: 1px solid var(--border-light);
-  padding: 1rem 2rem;
+  background: var(--color-primary);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.15);
+  padding: 0.85rem 2rem;
   position: sticky;
   top: 0;
   z-index: 100;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.08);
 }
 
 .brand {
@@ -97,62 +92,63 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .brand-title {
-  font-size: 1.5rem;
-  background: linear-gradient(to right, #fff, var(--color-primary), var(--color-secondary));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  font-weight: 800;
+  font-size: 1.35rem;
+  color: #ffffff;
+  font-weight: 700;
 }
 
 .brand-subtitle {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  font-weight: 300;
-  letter-spacing: 0.1em;
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 400;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
 }
 
 .nav-links {
   display: flex;
-  gap: 1rem;
+  gap: 0.75rem;
 }
 
 .nav-btn {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--border-light);
-  color: var(--text-main);
-  padding: 0.5rem 1rem;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  padding: 0.45rem 0.9rem;
   border-radius: var(--radius-md);
   cursor: pointer;
   font-family: var(--font-title);
-  font-size: 0.9rem;
-  font-weight: 500;
-  transition: all 0.3s ease;
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
   display: flex;
   align-items: center;
   gap: 0.5rem;
 }
 
-.nav-btn:hover, .nav-btn.active {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
-  box-shadow: 0 0 15px var(--color-primary-glow);
+.nav-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.3);
 }
 
-/* Cam Panel Kartları (Glassmorphism) */
+.nav-btn.active {
+  background: var(--color-secondary);
+  border-color: var(--color-secondary);
+}
+
+/* Düz Kurumsal Panel Kartları */
 .glass-panel {
   background: var(--bg-card);
-  backdrop-filter: blur(var(--blur-amount));
   border: 1px solid var(--border-light);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-premium);
   padding: 2rem;
-  transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .glass-panel:hover {
-  border-color: var(--border-glow);
-  box-shadow: 0 10px 40px rgba(124, 58, 237, 0.05);
+  border-color: var(--border-light);
+  box-shadow: 0 6px 12px rgba(0,0,0,0.03);
 }
 
 /* Buton Tasarımları */
@@ -199,23 +195,23 @@ h1, h2, h3, h4, h5, h6 {
   background: var(--color-agree);
 }
 .btn-agree:hover {
-  box-shadow: 0 4px 20px var(--color-agree-glow);
+  opacity: 0.9;
 }
 
 .btn-disagree {
   background: var(--color-disagree);
 }
 .btn-disagree:hover {
-  box-shadow: 0 4px 20px var(--color-disagree-glow);
+  opacity: 0.9;
 }
 
 .btn-pass {
-  background: rgba(255, 255, 255, 0.15);
-  border: 1px solid var(--border-light);
-  color: var(--text-main);
+  background: #e2e8f0;
+  border: 1px solid #cbd5e1;
+  color: #334155;
 }
 .btn-pass:hover {
-  background: rgba(255, 255, 255, 0.25);
+  background: #cbd5e1;
 }
 
 .btn:disabled {
@@ -234,27 +230,26 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .form-label {
-  font-size: 0.9rem;
-  font-weight: 500;
+  font-size: 0.85rem;
+  font-weight: 600;
   color: var(--text-muted);
 }
 
 .form-input, .form-textarea {
-  background: rgba(255, 255, 255, 0.03);
+  background: #ffffff;
   border: 1px solid var(--border-light);
   border-radius: var(--radius-md);
-  padding: 0.75rem 1rem;
+  padding: 0.65rem 0.85rem;
   color: var(--text-main);
   font-family: var(--font-body);
-  font-size: 1rem;
-  transition: all 0.3s ease;
+  font-size: 0.95rem;
+  transition: all 0.2s ease;
 }
 
 .form-input:focus, .form-textarea:focus {
   outline: none;
-  border-color: var(--color-primary);
-  background: rgba(255, 255, 255, 0.05);
-  box-shadow: 0 0 10px var(--color-primary-glow);
+  border-color: var(--color-secondary);
+  box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.15);
 }
 
 /* Lobi Ekranı */
@@ -275,18 +270,17 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .lobby-intro h1 {
-  font-size: 3rem;
-  line-height: 1.1;
+  font-size: 2.5rem;
+  line-height: 1.15;
   margin-bottom: 1.5rem;
-  background: linear-gradient(135deg, #fff 30%, var(--text-muted));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: var(--color-primary);
+  font-weight: 800;
 }
 
 .lobby-intro p {
   color: var(--text-muted);
   line-height: 1.6;
-  font-size: 1.1rem;
+  font-size: 1.05rem;
   margin-bottom: 2rem;
 }
 
@@ -298,11 +292,12 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .concept-card {
-  background: rgba(255, 255, 255, 0.02);
+  background: #ffffff;
   border: 1px solid var(--border-light);
   border-radius: var(--radius-md);
   padding: 1rem;
   text-align: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
 }
 
 .concept-card-icon {
@@ -314,6 +309,7 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 700;
   font-size: 0.9rem;
   margin-bottom: 0.25rem;
+  color: var(--color-primary);
 }
 
 .concept-card-desc {
@@ -322,8 +318,8 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .question-highlight-box {
-  background: rgba(168, 85, 247, 0.08);
-  border-left: 4px solid var(--color-primary);
+  background: #f1f5f9;
+  border-left: 4px solid var(--color-secondary);
   border-radius: 4px var(--radius-md) var(--radius-md) 4px;
   padding: 1.5rem;
   margin-bottom: 2rem;
@@ -333,14 +329,14 @@ h1, h2, h3, h4, h5, h6 {
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: var(--color-primary);
+  color: var(--color-secondary);
   margin-bottom: 0.5rem;
 }
 
 .question-highlight-box p {
   font-size: 1.25rem;
-  font-weight: 600;
-  color: #fff;
+  font-weight: 700;
+  color: var(--text-dark);
   margin-bottom: 0;
   line-height: 1.4;
 }
@@ -377,7 +373,10 @@ h1, h2, h3, h4, h5, h6 {
   flex-direction: column;
   justify-content: space-between;
   overflow: hidden;
-  background: radial-gradient(100% 100% at 0% 0%, rgba(30, 20, 55, 0.8) 0%, rgba(15, 8, 30, 0.8) 100%);
+  background: #ffffff;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-premium);
 }
 
 .vote-card-header {
@@ -389,13 +388,12 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .vote-card-content {
-  font-size: 1.35rem;
-  font-weight: 500;
+  font-size: 1.25rem;
+  font-weight: 700;
   line-height: 1.5;
-  color: #fff;
+  color: var(--text-dark);
   margin: 1.5rem 0;
   font-family: var(--font-title);
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 .vote-card-author {
@@ -412,7 +410,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .progress-bar-container {
-  background: rgba(255, 255, 255, 0.05);
+  background: #e2e8f0;
   border-radius: 10px;
   height: 6px;
   width: 100%;
@@ -421,7 +419,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .progress-bar-fill {
-  background: var(--color-primary);
+  background: var(--color-secondary);
   height: 100%;
   transition: width 0.3s ease;
 }
@@ -450,11 +448,10 @@ h1, h2, h3, h4, h5, h6 {
   width: 100%;
   aspect-ratio: 1;
   max-width: 450px;
-  background: rgba(255, 255, 255, 0.02);
+  background: #ffffff;
   border: 1px solid var(--border-light);
   border-radius: var(--radius-lg);
   overflow: hidden;
-  box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
 }
 
 .chart-svg {
@@ -463,12 +460,12 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .chart-grid-line {
-  stroke: rgba(255, 255, 255, 0.03);
+  stroke: #f1f5f9;
   stroke-width: 1;
 }
 
 .chart-axis {
-  stroke: rgba(255, 255, 255, 0.1);
+  stroke: #cbd5e1;
   stroke-width: 1.5;
   stroke-dasharray: 4;
 }
@@ -480,13 +477,13 @@ h1, h2, h3, h4, h5, h6 {
 
 .chart-point:hover {
   r: 10;
-  stroke: #fff;
+  stroke: var(--color-primary);
   stroke-width: 1.5;
 }
 
 .chart-point-self {
   animation: pulse 2s infinite;
-  stroke: #fff;
+  stroke: var(--color-primary);
   stroke-width: 2;
   r: 10;
 }
@@ -551,9 +548,7 @@ h1, h2, h3, h4, h5, h6 {
   font-size: 2rem;
   line-height: 1.2;
   font-weight: 800;
-  background: linear-gradient(to right, #fff 70%, var(--text-muted));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: var(--color-primary);
 }
 
 .live-stats-row {
@@ -563,7 +558,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .stat-box {
-  background: rgba(255, 255, 255, 0.02);
+  background: #ffffff;
   border: 1px solid var(--border-light);
   border-radius: var(--radius-md);
   padding: 1rem;
@@ -594,7 +589,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .bridge-item {
-  background: linear-gradient(to right, rgba(16, 185, 129, 0.05), transparent);
+  background: linear-gradient(to right, rgba(21, 115, 71, 0.05), transparent);
   border-left: 4px solid var(--color-agree);
   border-radius: 4px var(--radius-md) var(--radius-md) 4px;
   padding: 1.25rem;
@@ -612,7 +607,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .bridge-tag {
-  background: rgba(16, 185, 129, 0.15);
+  background: rgba(21, 115, 71, 0.1);
   color: var(--color-agree);
   padding: 0.2rem 0.5rem;
   border-radius: 4px;
@@ -631,7 +626,7 @@ h1, h2, h3, h4, h5, h6 {
   border: 1px solid var(--border-light);
   border-radius: var(--radius-md);
   padding: 1.25rem;
-  background: rgba(255, 255, 255, 0.01);
+  background: #ffffff;
 }
 
 .camp-header {
@@ -639,7 +634,7 @@ h1, h2, h3, h4, h5, h6 {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 1rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
   padding-bottom: 0.5rem;
 }
 
@@ -668,7 +663,7 @@ h1, h2, h3, h4, h5, h6 {
   line-height: 1.4;
   color: var(--text-main);
   padding-left: 1rem;
-  border-left: 2px solid rgba(255,255,255,0.1);
+  border-left: 2px solid var(--border-light);
 }
 
 .camp-statement-meta {
@@ -695,7 +690,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .moderation-item {
-  background: rgba(255, 255, 255, 0.02);
+  background: #ffffff;
   border: 1px solid var(--border-light);
   border-radius: var(--radius-md);
   padding: 1.25rem;
@@ -737,11 +732,12 @@ h1, h2, h3, h4, h5, h6 {
   background: #fff;
   color: var(--text-dark);
   border-radius: var(--radius-lg);
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--border-light);
 }
 
 .report-header {
-  border-bottom: 3px double #ddd;
+  border-bottom: 3px double #cbd5e1;
   padding-bottom: 1.5rem;
   margin-bottom: 2rem;
   text-align: center;
@@ -750,12 +746,12 @@ h1, h2, h3, h4, h5, h6 {
 .report-title {
   font-size: 2.2rem;
   font-weight: 800;
-  color: #111;
+  color: var(--color-primary);
   margin-bottom: 0.5rem;
 }
 
 .report-subtitle {
-  color: #666;
+  color: var(--text-muted);
   font-size: 1rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -766,9 +762,9 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .report-section h3 {
-  border-left: 4px solid #7c3aed;
+  border-left: 4px solid var(--color-secondary);
   padding-left: 0.75rem;
-  color: #111;
+  color: var(--color-primary);
   margin-bottom: 1rem;
   font-size: 1.3rem;
 }
@@ -780,33 +776,33 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .report-table th, .report-table td {
-  border: 1px solid #e5e7eb;
+  border: 1px solid #cbd5e1;
   padding: 0.75rem 1rem;
   text-align: left;
 }
 
 .report-table th {
-  background: #f9fafb;
-  color: #374151;
-  font-weight: 600;
+  background: #f8fafc;
+  color: var(--text-dark);
+  font-weight: 700;
 }
 
 .report-table tr:nth-child(even) {
-  background: #f9fafb;
+  background: #f8fafc;
 }
 
 .report-camp-card {
-  border: 1px solid #e5e7eb;
+  border: 1px solid #cbd5e1;
   border-radius: var(--radius-md);
   padding: 1.25rem;
   margin-bottom: 1rem;
-  background: #f9fafb;
+  background: #f8fafc;
 }
 
 .report-camp-title {
   font-weight: 700;
   font-size: 1.1rem;
-  color: #111;
+  color: var(--color-primary);
   margin-bottom: 0.75rem;
 }
 
@@ -848,19 +844,18 @@ h1, h2, h3, h4, h5, h6 {
   padding: 0.25rem 0.6rem;
   border-radius: 999px;
   font-weight: 600;
-  border: 1px solid rgba(255,255,255,0.08);
 }
 
 .status-connected {
-  background: rgba(16, 185, 129, 0.15);
+  background: rgba(21, 115, 71, 0.15);
   color: var(--color-agree);
-  border-color: rgba(16, 185, 129, 0.3);
+  border-color: rgba(21, 115, 71, 0.3);
 }
 
 .status-disconnected {
-  background: rgba(239, 68, 68, 0.15);
+  background: rgba(187, 45, 59, 0.15);
   color: var(--color-disagree);
-  border-color: rgba(239, 68, 68, 0.3);
+  border-color: rgba(187, 45, 59, 0.3);
 }
 
 /* Katılımcı Yönetim Listesi */
@@ -878,7 +873,7 @@ h1, h2, h3, h4, h5, h6 {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: rgba(255, 255, 255, 0.02);
+  background: #ffffff;
   border: 1px solid var(--border-light);
   padding: 0.6rem 0.8rem;
   border-radius: var(--radius-md);
@@ -886,15 +881,16 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .participant-list-item:hover {
-  border-color: var(--border-glow);
-  background: rgba(255, 255, 255, 0.04);
+  border-color: var(--color-secondary);
+  background: var(--bg-card-hover);
 }
 
 .participant-list-name {
-  font-weight: 500;
+  font-weight: 600;
   display: flex;
   align-items: center;
   gap: 0.4rem;
+  color: var(--text-dark);
 }
 
 .participant-list-meta {
@@ -967,7 +963,7 @@ h1, h2, h3, h4, h5, h6 {
 .report-cover {
   text-align: center;
   padding: 3rem 1rem 2rem;
-  border-bottom: 2px solid #e5e7eb;
+  border-bottom: 2px solid #cbd5e1;
   margin-bottom: 2.5rem;
 }
 
@@ -976,7 +972,7 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #7c3aed;
+  color: var(--color-primary);
   margin-bottom: 0.5rem;
 }
 
@@ -984,7 +980,7 @@ h1, h2, h3, h4, h5, h6 {
   font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.08em;
-  color: #9ca3af;
+  color: var(--text-muted);
   text-transform: uppercase;
   margin-bottom: 1.5rem;
 }
@@ -992,7 +988,7 @@ h1, h2, h3, h4, h5, h6 {
 .report-main-title {
   font-size: 1.9rem;
   font-weight: 800;
-  color: #111827;
+  color: var(--color-primary);
   line-height: 1.3;
   margin-bottom: 2rem;
 }
@@ -1003,7 +999,7 @@ h1, h2, h3, h4, h5, h6 {
   gap: 0.75rem;
   max-width: 700px;
   margin: 0 auto;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #cbd5e1;
   border-radius: 8px;
   overflow: hidden;
 }
@@ -1012,8 +1008,8 @@ h1, h2, h3, h4, h5, h6 {
   display: flex;
   flex-direction: column;
   padding: 0.6rem 0.85rem;
-  background: #f9fafb;
-  border-right: 1px solid #e5e7eb;
+  background: #f8fafc;
+  border-right: 1px solid #cbd5e1;
 }
 
 .report-meta-item:nth-child(3n) {
@@ -1023,7 +1019,7 @@ h1, h2, h3, h4, h5, h6 {
 .report-meta-label {
   font-size: 0.7rem;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-bottom: 0.2rem;
@@ -1032,7 +1028,7 @@ h1, h2, h3, h4, h5, h6 {
 .report-meta-value {
   font-size: 1rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--color-primary);
 }
 
 /* Bölüm Başlıkları */
@@ -1042,34 +1038,37 @@ h1, h2, h3, h4, h5, h6 {
   gap: 0.5rem;
   font-size: 1.2rem;
   font-weight: 700;
-  color: #111827;
-  border-bottom: 2px solid #ede9fe;
+  color: var(--color-primary);
+  border-bottom: 2px solid #cbd5e1;
   padding-bottom: 0.5rem;
   margin-bottom: 1rem;
 }
 
 .report-section-num {
-  color: #7c3aed;
+  color: var(--color-secondary);
   font-variant-numeric: tabular-nums;
   min-width: 1.8rem;
 }
 
 /* Özet kutusu */
 .report-abstract {
-  background: #f5f3ff;
-  border-left: 4px solid #7c3aed;
+  background: #f8fafc;
+  border-left: 4px solid var(--color-secondary);
   padding: 1rem 1.25rem;
   border-radius: 0 8px 8px 0;
   font-size: 0.92rem;
   line-height: 1.7;
-  color: #1f2937;
+  color: var(--text-main);
+  border-top: 1px solid #cbd5e1;
+  border-right: 1px solid #cbd5e1;
+  border-bottom: 1px solid #cbd5e1;
 }
 
 /* Body text */
 .report-body-text {
   font-size: 0.91rem;
   line-height: 1.7;
-  color: #374151;
+  color: var(--text-main);
   margin-bottom: 1rem;
 }
 
@@ -1082,8 +1081,8 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .report-method-card {
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
   border-radius: 8px;
   padding: 0.75rem 1rem;
 }
@@ -1091,36 +1090,39 @@ h1, h2, h3, h4, h5, h6 {
 .report-method-title {
   font-weight: 700;
   font-size: 0.85rem;
-  color: #374151;
+  color: var(--color-primary);
   margin-bottom: 0.25rem;
 }
 
 .report-method-body {
   font-size: 0.8rem;
-  color: #6b7280;
+  color: var(--text-muted);
   line-height: 1.5;
 }
 
 /* Alıntı kutusu (konu) */
 .report-blockquote {
-  border-left: 4px solid #7c3aed;
+  border-left: 4px solid var(--color-secondary);
   margin: 0;
   padding: 1rem 1.5rem;
-  background: #faf5ff;
+  background: #f8fafc;
   border-radius: 0 8px 8px 0;
   font-size: 1.1rem;
-  font-weight: 600;
-  color: #111827;
+  font-weight: 700;
+  color: var(--color-primary);
   line-height: 1.5;
   font-style: italic;
+  border-top: 1px solid #cbd5e1;
+  border-right: 1px solid #cbd5e1;
+  border-bottom: 1px solid #cbd5e1;
 }
 
 /* Rapor alt bilgisi */
 .report-footer {
   margin-top: 3rem;
   padding-top: 1.5rem;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid #cbd5e1;
   text-align: center;
   font-size: 0.8rem;
-  color: #6b7280;
+  color: var(--text-muted);
 }

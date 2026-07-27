@@ -148,10 +148,10 @@ export default function AdminDashboard({
     <div className="admin-container" style={{ display: 'flex', flexDirection: 'column', gap: '2rem', maxWidth: '1200px', margin: '0 auto', padding: '0 1rem 3rem 1rem' }}>
       
       {/* Aktif Yönetilen Oturum Başlık Kartı */}
-      <div style={{ background: 'rgba(88, 28, 135, 0.15)', border: '1px solid rgba(168, 85, 247, 0.3)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+      <div style={{ background: 'var(--bg-card-hover)', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
-            <h1 style={{ fontSize: '1.4rem', fontWeight: 'bold', color: '#fff', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+            <h1 style={{ fontSize: '1.4rem', fontWeight: 'bold', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
               <Shield className="text-secondary" size={22} />
               {lang === 'tr' ? 'Sistem Yönetim Paneli' : 'System Administration Panel'}
             </h1>
@@ -161,7 +161,7 @@ export default function AdminDashboard({
           </div>
           <div style={{ textAlign: 'right', minWidth: '150px' }}>
             <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', fontWeight: 600 }}>{lang === 'tr' ? 'YÖNETİLEN AKTİF OTURUM' : 'ACTIVELY MANAGED SESSION'}</span>
-            <code style={{ fontSize: '1.2rem', color: '#c084fc', background: 'rgba(0,0,0,0.3)', padding: '0.2rem 0.6rem', borderRadius: '6px', fontWeight: 'bold', display: 'inline-block', marginTop: '0.25rem', border: '1px solid rgba(168, 85, 247, 0.4)' }}>
+            <code style={{ fontSize: '1.2rem', color: 'var(--color-primary)', background: 'var(--bg-main)', padding: '0.2rem 0.6rem', borderRadius: '6px', fontWeight: 'bold', display: 'inline-block', marginTop: '0.25rem', border: '1px solid var(--border-light)' }}>
               {activeSessionCode}
             </code>
           </div>
@@ -169,9 +169,9 @@ export default function AdminDashboard({
 
         {/* Inline Oturum Düzenleme Formu */}
         {editingSession && (
-          <div style={{ borderTop: '1px solid rgba(168, 85, 247, 0.25)', padding: '1.5rem', background: 'rgba(0,0,0,0.25)' }}>
+          <div style={{ borderTop: '1px solid var(--border-light)', padding: '1.5rem', background: 'var(--bg-card)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-              <h2 style={{ fontSize: '1.1rem', color: '#c084fc', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <h2 style={{ fontSize: '1.1rem', color: 'var(--color-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <Settings size={18} />
                 {lang === 'tr' ? `Düzenleniyor: ${editingSession.code}` : `Editing: ${editingSession.code}`}
               </h2>
@@ -215,14 +215,14 @@ export default function AdminDashboard({
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
                 <div className="form-group" style={{ margin: 0 }}>
                   <label className="form-label">{lang === 'tr' ? 'Erişim Türü' : 'Access'}</label>
-                  <select className="form-input" value={editVisibility} onChange={(e) => setEditVisibility(e.target.value)} style={{ background: '#110c22', color: '#fff' }}>
+                  <select className="form-input" value={editVisibility} onChange={(e) => setEditVisibility(e.target.value)} style={{ background: 'var(--bg-card)', color: 'var(--text-main)' }}>
                     <option value="PUBLIC">{lang === 'tr' ? '🌐 Herkese Açık' : '🌐 Public'}</option>
                     <option value="PASSWORD_PROTECTED">{lang === 'tr' ? '🔒 Şifreli' : '🔒 Protected'}</option>
                   </select>
                 </div>
                 <div className="form-group" style={{ margin: 0 }}>
                   <label className="form-label">{lang === 'tr' ? 'Durum' : 'Status'}</label>
-                  <select className="form-input" value={editStatus} onChange={(e) => setEditStatus(e.target.value)} style={{ background: '#110c22', color: '#fff' }}>
+                  <select className="form-input" value={editStatus} onChange={(e) => setEditStatus(e.target.value)} style={{ background: 'var(--bg-card)', color: 'var(--text-main)' }}>
                     <option value="active">{lang === 'tr' ? '▶️ Aktif' : '▶️ Active'}</option>
                     <option value="paused">{lang === 'tr' ? '⏸️ Durduruldu' : '⏸️ Paused'}</option>
                   </select>
@@ -274,7 +274,7 @@ export default function AdminDashboard({
               </thead>
               <tbody>
                 {sessionsOverview.map(s => (
-                  <tr key={s.code} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: activeSessionCode === s.code ? 'rgba(168, 85, 247, 0.05)' : 'transparent' }}>
+                  <tr key={s.code} style={{ borderBottom: '1px solid var(--border-light)', background: activeSessionCode === s.code ? 'rgba(29, 78, 216, 0.05)' : 'transparent' }}>
                     <td style={{ padding: '0.75rem' }}>
                       <button
                         onClick={() => onSelectSession && onSelectSession(s.code)}
@@ -282,7 +282,7 @@ export default function AdminDashboard({
                         style={{
                           background: 'none',
                           border: 'none',
-                          color: activeSessionCode === s.code ? '#c084fc' : 'var(--color-secondary)',
+                          color: activeSessionCode === s.code ? 'var(--color-primary)' : 'var(--color-secondary)',
                           fontWeight: 'bold',
                           cursor: 'pointer',
                           textDecoration: 'underline',
@@ -306,7 +306,7 @@ export default function AdminDashboard({
                       <button
                         onClick={() => handleOpenEditModal(s)}
                         className="btn"
-                        style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', borderColor: editingSession && editingSession.code === s.code ? '#a855f7' : '#c084fc', color: editingSession && editingSession.code === s.code ? '#a855f7' : '#c084fc', minWidth: 'auto', background: editingSession && editingSession.code === s.code ? 'rgba(168,85,247,0.12)' : 'transparent' }}
+                        style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', borderColor: 'var(--color-secondary)', color: 'var(--color-secondary)', minWidth: 'auto', background: editingSession && editingSession.code === s.code ? 'rgba(29, 78, 216, 0.1)' : 'transparent' }}
                       >
                         {editingSession && editingSession.code === s.code
                           ? (lang === 'tr' ? '✕ Kapat' : '✕ Close')

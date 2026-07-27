@@ -241,7 +241,7 @@ export default function Lobby({ question, onJoin, participantsCount, lang = 'tr'
                 className="form-input" 
                 value={joinVisibility}
                 onChange={(e) => setJoinVisibility(e.target.value)}
-                style={{ background: '#110c22', color: '#fff' }}
+                style={{ background: 'var(--bg-card)', color: 'var(--text-main)' }}
               >
                 <option value="PUBLIC">{lang === 'tr' ? 'Herkese Açık (Şifresiz)' : 'Public (No Password)'}</option>
                 <option value="PASSWORD_PROTECTED">{lang === 'tr' ? 'Şifreli (Parolalı)' : 'Private (Password Protected)'}</option>
