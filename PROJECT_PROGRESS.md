@@ -95,6 +95,31 @@ Bu doküman, Müzakere Masası projesinin başlangıçtan itibaren geçirmiş ol
 
 ---
 
+## 🚀 Aşama 5: Kurumsal Güvenlik ve Arayüz Optimizasyonu (Mevcut Aşama)
+
+- [x] **Katılım Gerekçesi Kaldırma ve 750 Karakter Görüş Sınırı**
+  - Giriş ekranından "Katılma gerekçeniz" alanı ve minimum 15 karakterlik doğrulama kaldırıldı, legacy veriler için gerekçe alanı varsayılan boş string (`""`) yapıldı.
+  - Görüş ekleme karakter limiti 140'tan `750` karaktere çıkarıldı (frontend validation ve backend trimming).
+- [x] **Anonim Oylama & Boş Başlangıç**
+  - Oylama kartlarındaki yazar rumuzu gizlenerek oylama tamamen anonimleştirildi.
+  - Yeni oluşturulan oturumların varsayılan örnek görüşlerle başlaması engellendi, oturumlar tamamen boş başlamaktadır.
+- [x] **Şifreli Oturum Konusu/Görüşleri Gizleme & API/CSV Koruma**
+  - Şifre korumalı oturumların başlığı ve görüşleri, geçerli token doğrulanana kadar hem HTTP API hem de WebSocket kanallarında gizlendi.
+  - CSV dışa aktarma ve Rapor çekme API rotaları `checkParticipantAccess` middleware'ine bağlandı.
+- [x] **Canlı Ekran Bağlam Kontrolü & Dinamik URL Yönlendirme**
+  - `/live` ve `/live/:code` sayfalarına sadece dahil olunan aktif oturum bağlamında erişilebilmesi sağlandı. Yetkisiz girişlerde URL temizlenerek kullanıcı lobiye atılır.
+  - Arayüzdeki ekran geçişleri (live, report, admin, lobby) tarayıcı adres satırı URL'si ile dinamik senkronize edildi.
+  - Katılımcı ekranında "Yönetim Paneli" butonu gizlendi.
+- [x] **Güvenli Oturum Arşivleme & Sıfırlama**
+  - Oturum sıfırlama metodu (`reset`) güncellenerek veritabanındaki tüm analiz, görüş, üye ve polarization geçmişinin kalıcı silinmesi sağlandı.
+  - Sıfırlanan oturum `status: 'archived'` olarak işaretlenip admin paneli genel listesinden gizlendi ve bu kodla tekrar katılım engellendi.
+- [x] **e-Devlet Kurumsal Tema Redesign**
+  - Uygulama teması cam/mor karanlık tasarımdan arındırıldı.
+  - e-Devlet ve resmi kamu kurumları tarzı lacivert (`#0c2340`), koyu mavi, beyaz ve açık gri hafif kurumsal bir görünüme geçildi.
+  - Canlı scatter plot grafiği beyaz arkaplana çekildi ve etiket renkleri okunaklı hale getirildi.
+
+---
+
 ## 🧪 Test ve Doğrulama Durumu
 
 | Test Adı | Açıklama | Durum |
@@ -105,22 +130,26 @@ Bu doküman, Müzakere Masası projesinin başlangıçtan itibaren geçirmiş ol
 | Token İptali | Şifre değiştiğinde eski katılımcı token'ının reddedilmesi (HTTP 403) | ✅ BAŞARILI |
 | Yerleşik Moderasyon | Moderatörün görüş onaylaması ve canlı oylamaya düşmesi | ✅ BAŞARILI |
 | Moderatör Şifre Ayarı | Moderatörün yerleşik panelden masa şifresini değiştirebilmesi | ✅ BAŞARILI |
-| Vite / Build | Frontend derleme ve modül dönüşüm kontrolleri (49 modül) | ✅ BAŞARILI |
+| Canlı Ekran Rotaları | Yetkisiz /live erişiminin reddedilip lobiye atılması | ✅ BAŞARILI |
+| Güvenli Arşivleme | Sıfırlanan oturumun admin listesinden kalkması ve katılımın kapanması | ✅ BAŞARILI |
 | Vitest PCA | PCA matris indirgeme birim testi | ✅ BAŞARILI |
 | Vitest K-Means | K-Means kümeleme birim testi | ✅ BAŞARILI |
 | Vitest Köprü Cümle | Köprü Cümle kuralı doğrulama birim testi | ✅ BAŞARILI |
-| Backend Syntax | `node --check index.js` syntax doğrulaması | ✅ BAŞARILI |
+| Arayüz Derlemesi | `npm run build` ile hatasız kurumsal sürüm çıktısı alma | ✅ BAŞARILI |
 
 ---
 
 ## 📂 Dosya Yapısı Haritası
 
-- `backend/index.js` — Express REST, Socket.io, LLM entegrasyonu ve rapor endpoint'i.
-- `backend/src/middleware/auth.middleware.js` — `authenticateAdmin`, `checkParticipantAccess`, `checkModerator`, `passwordRateLimiter`.
-- `backend/src/services/llm.service.js` — OpenAI SDK entegrasyonlu küme özetleyicisi (fallback destekli).
-- `backend/tests/analysis.test.js` — Vitest birim testleri (PCA, K-Means, Köprü Cümle).
-- `backend/prisma/schema.prisma` — Veri modeli şeması.
-- `docker-compose.yml` — PostgreSQL 16 container tanımı.
-- `frontend/src/App.jsx` — Ana React bileşeni (Moderatör Paneli, Rapor butonları dahil).
-- `frontend/src/index.css` — Tasarım sistemi, Glassmorphism ve `@media print` stilleri.
-- `run.ps1` — Tek tıkla backend + frontend başlatma scripti.
+- `server/index.js` — Express REST, Socket.io, LLM entegrasyonu, yetkilendirmeler ve arşivleme rotaları.
+- `server/middleware/auth.middleware.js` — `authenticateAdmin`, `checkParticipantAccess` (headers & query desteği), `checkModerator`.
+- `server/database.js` — Prisma destekli oturum yönetimi, `reset` (arşivleme & temizlik) ve veri ekleme/silme.
+- `server/algorithms.js` — PCA, K-Means ve Köprü Cümle motoru.
+- `server/tests/` — Vitest analiz ve yetki matrisi birim testleri.
+- `src/App.jsx` — URL/Ekran yönlendiricisi ve e-Devlet teması navbar/dil kontrolleri.
+- `src/App.css` — Kamu kurumu resmi lacivert-beyaz-gri kurumsal tasarım dosyası.
+- `src/components/Lobby.jsx` — Gerekçe kaldırılmış, kurumsal form giriş ve masa oluşturma arayüzü.
+- `src/components/Participant.jsx` — Anonimleştirilmiş oylama, arama/filtreleme özellikli görüş havuzu ve moderasyon paneli.
+- `src/components/LiveScreen.jsx` — Yüksek kontrastlı SVG scatter plot fikir haritası ve canlı consensus paneli.
+- `src/components/ReportView.jsx` | `App.css` — Akademik standartlarda basılabilir (print-friendly) sonuç raporu.
+

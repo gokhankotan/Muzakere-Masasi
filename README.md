@@ -43,7 +43,7 @@ Habermas'ın öne sürdüğü, gerçek bir uzlaşının sağlanabilmesi için ge
 | İlke | Platformdaki Karşılığı |
 |------|----------------------|
 | **Eşit Katılım** | Her katılımcının eşit oy hakkı, anonim oylama sistemi |
-| **Gerekçelendirme** | Katılım için minimum 15 karakterlik gerekçe zorunluluğu |
+| **Gerekçelendirme** | Fikir havuzunda rasyonel gerekçelendirme ve müzakere olanağı |
 | **Samimiyet** | Anonim ve baskısız oy kullanma ortamı |
 | **Evrensel Erişim** | Herkese açık (PUBLIC) veya şifre korumalı katılım |
 
@@ -51,16 +51,18 @@ Habermas'ın öne sürdüğü, gerçek bir uzlaşının sağlanabilmesi için ge
 
 ## ✨ Yeni Eklenen Özellikler (Aşama 5 - 9)
 
-Müzakere Masası platformunun son aşamalarında aşağıdaki kurumsal analitik ve moderasyon özellikleri entegre edilmiştir:
+Müzakere Masası platformunun son aşamalarında aşağıdaki kurumsal analitik, güvenlik ve arayüz özellikleri entegre edilmiştir:
 
-1. 🗺️ **Dinamik Fikir Haritası Tooltip'leri:** 2D Scatter Plot haritası üzerindeki katılımcı noktalarına gelindiğinde nickname, bot/gerçek durumu ve rasyonel gerekçesi etkileşimli bir tooltip ile yansıtılır.
-2. 🛡️ **Gelişmiş Moderasyon & Katılımcı Engelleme (Ban/Kick):** Moderatör veya yöneticiler sabote edici kullanıcıları masadan atabilir. Atılan kullanıcının oyları ve gerekçeleri anında analiz matrisinden düşürülür.
-3. 🌉 **Görüş Havuzu (Opinion Pool):** Katılımcılar approved olmuş tüm görüşler arasından kelime bazlı arama yapabilir, kamplara veya uzlaşılan köprülere göre süzebilir ve oylarını anında havuz üzerinden güncelleyebilirler.
-4. 🗳️ **Offline Oylama & Arka Plan Sync:** İnternet veya soket bağlantısı koptuğunda katılımcının oyları yerelde sıraya alınır (kuyruk). Bağlantı geri geldiğinde oylar arka planda sunucuya otomatik olarak aktarılır.
-5. 🌐 **Çoklu Dil Desteği (i18n):** Arayüzün sağ üst köşesinden `TR` ve `EN` dilleri arasında anlık geçiş yapılabilir. Kullanıcı tercihleri `localStorage` ile saklanır.
-6. 🎛️ **Dinamik Kamp Sayısı Belirleme (K Ayarı):** Yönetici panelinden hedef kamp sayısı `2`, `3`, `4` veya `5` olarak dinamik atanabilir ve K-Means kümelemesi anında güncellenir.
-7. ✍️ **Fikir Kamplarını Yeniden Adlandırma:** Algoritmik otomatik isimlerin yerine yöneticiler kamplara özel isimler atayabilir. Bu isimler Canlı Ekran ve Sonuç Raporunda güncellenir.
-8. 📈 **Kutuplaşma Derecesi Değişim Trendi:** Bulgular & Rapor ekranının altına, süreçteki analizlerin kutuplaşma geçmişini gösteren etkileşimli, tooltip destekli şık bir **SVG Çizgi Grafik** eklenmiştir.
+1. 👤 **Anonim Oylama Yapısı:** Katılımcıların oy verirken önyargıdan uzak durabilmeleri için oylama kartlarından yazar rumuzları kaldırılmış, tam anonimlik sağlanmıştır.
+2. ✍️ **750 Karakter Görüş Sınırı:** Katılımcıların fikirlerini daha detaylı ifade edebilmeleri amacıyla görüş ekleme limiti 750 karaktere çıkartılmıştır.
+3. 🗺️ **Dinamik Fikir Haritası Tooltip'leri:** 2D Scatter Plot haritası üzerindeki katılımcı noktalarına gelindiğinde nickname ve bot/gerçek durumu tooltip ile yansıtılır.
+4. 🛡️ **Gelişmiş Moderasyon & Katılımcı Engelleme (Ban/Kick):** Yöneticiler sabote edici kullanıcıları masadan atabilir. Atılan kullanıcının oyları anında analiz matrisinden düşürülür.
+5. 🌉 **Görüş Havuzu (Opinion Pool):** Katılımcılar approved olmuş tüm görüşler arasından kelime bazlı arama yapabilir, kamplara veya uzlaşılan köprülere göre süzebilir ve oylarını anında havuz üzerinden güncelleyebilirler.
+6. 🗳️ **Offline Oylama & Arka Plan Sync:** İnternet koptuğunda katılımcının oyları yerelde sıraya alınır ve bağlantı geri geldiğinde sunucuya otomatik aktarılır.
+7. 🏛️ **Kurumsal e-Devlet Teması:** Arayüz, cam/mor parlak karanlık temadan tamamen arındırılarak kamu kurumlarına uygun güven verici lacivert (`#0c2340`), koyu mavi, beyaz ve açık gri hafif kurumsal bir tasarıma kavuşturulmuştur.
+8. 🔒 **Güçlendirilmiş Şifre Güvenliği:** Şifre korumalı oturumların konusu (deliberation topic) ve görüş listesi, şifre doğrulanana kadar ziyaretçilerden gizlenir.
+9. 🗺️ **Sınırlı Canlı Ekran Erişimi:** Canlı ekran `/live` ve `/live/:code` rotalarına sadece o oturuma dahil olmuş kullanıcıların ve yöneticilerin erişebilmesi sağlanmış, aktif ekran değişimleriyle tarayıcı URL'si dinamik senkronize edilmiştir.
+10. ♻️ **Güvenli Oturum Arşivleme & Sıfırlama:** "Oturumu Sıfırla" metodu veritabanındaki eski analizleri ve görüşleri kalıcı olarak temizler. Sıfırlanan oturum `status: 'archived'` olarak işaretlenerek admin seçim listelerinden kaldırılır ve bu kodla tekrar katılım engellenir.
 
 ---
 
@@ -106,12 +108,12 @@ müzakere-masası/
     ├── main.jsx                # React giriş noktası
     ├── App.jsx                 # Dil seçimi ve ana yönlendirici state
     ├── i18n.js                 # TR/EN çeviri sözlüğü ve t() yardımcısı
-    ├── App.css                 # Glassmorphic global stil şablonu
+    ├── App.css                 # Kurumsal global stil şablonu (e-Devlet teması)
     └── components/
-        ├── Lobby.jsx           # Giriş ekranı (masa kodu, rumuz, gerekçe)
+        ├── Lobby.jsx           # Giriş ekranı (masa kodu, rumuz, oturum tipi)
         ├── Participant.jsx     # Oylama, harita, Görüş Havuzu ve moderasyon
         ├── AdminDashboard.jsx  # Yönetici paneli, K seçimi, yeniden adlandırma
-        ├── LiveScreen.jsx      # Canlı projeksiyon ekranı
+        ├── LiveScreen.jsx      # Canlı projeksiyon ekranı (oturum bağlamı kontrollü)
         └── ReportView.jsx      # Sonuç raporu, SVG trend grafiği
 ```
 
