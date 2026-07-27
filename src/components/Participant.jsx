@@ -286,10 +286,6 @@ export default function Participant({
               </div>
 
               <div>
-                <div className="vote-card-author">
-                  Yazan: {unvotedStatements[0].author}
-                </div>
-
                 <div className="vote-actions">
                   <button onClick={() => handleVoteAction(unvotedStatements[0].id, 1)} className="btn btn-agree">
                     <ThumbsUp size={18} /> Katılıyorum
