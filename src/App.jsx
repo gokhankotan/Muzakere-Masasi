@@ -297,6 +297,12 @@ export default function App() {
 
   // Masadan kalkma
   const handleLogoutParticipant = () => {
+    if (participant && socketRef.current) {
+      socketRef.current.emit('leave-session', {
+        sessionCode: activeSessionCode,
+        participantId: participant.id
+      });
+    }
     localStorage.removeItem('muzakere_participant');
     setParticipant(null);
     setIsModerator(false);

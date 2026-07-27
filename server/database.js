@@ -486,6 +486,17 @@ class Database {
     return participant;
   }
 
+  removeParticipant(sessionCode, participantId) {
+    const session = this.sessions.get(sessionCode);
+    if (!session) return false;
+    const idx = session.participants.findIndex(p => p.id === participantId);
+    if (idx === -1) return false;
+    session.participants.splice(idx, 1);
+    // PostgreSQL'de katılımcıyı tutmak isteyebilirsiniz (veri saklama için).
+    // Burada yalnızca in-memory listeden kaldırıyoruz.
+    return true;
+  }
+
   castVote(sessionCode, participantId, statementId, voteValue) {
     const session = this.sessions.get(sessionCode);
     if (!session) return false;

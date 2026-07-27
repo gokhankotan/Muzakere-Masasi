@@ -906,3 +906,221 @@ h1, h2, h3, h4, h5, h6 {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* ────────────────────────────────────────────────
+   RAPOR BASKISI — Ekrana Özel / Yazdırmaya Özel
+   ──────────────────────────────────────────────── */
+
+/* Yazdırma sırasında gizlenecek elementler */
+.no-print {
+  display: block;
+}
+
+@media print {
+  /* Tüm sayfayı beyaz arkaplanla temizle */
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  /* Rapor dışındaki her şeyi gizle */
+  body > #root > * {
+    display: none !important;
+  }
+
+  /* Raporu görünür tut */
+  body > #root .report-container {
+    display: block !important;
+  }
+
+  /* Kontrol butonları, grafik, nav gizle */
+  .no-print {
+    display: none !important;
+  }
+
+  .report-container {
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 1.5cm 2cm !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+
+  /* Sayfa sonu ipuçları */
+  .report-section {
+    page-break-inside: avoid;
+  }
+
+  .report-cover {
+    page-break-after: always;
+  }
+
+  a[href]::after {
+    content: none !important;
+  }
+}
+
+/* ────────────────────────────────────────────────
+   AKADEMİK RAPOR — Yeni Bileşen Stilleri
+   ──────────────────────────────────────────────── */
+
+/* Kapak */
+.report-cover {
+  text-align: center;
+  padding: 3rem 1rem 2rem;
+  border-bottom: 2px solid #e5e7eb;
+  margin-bottom: 2.5rem;
+}
+
+.report-institution {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #7c3aed;
+  margin-bottom: 0.5rem;
+}
+
+.report-doc-type {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: #9ca3af;
+  text-transform: uppercase;
+  margin-bottom: 1.5rem;
+}
+
+.report-main-title {
+  font-size: 1.9rem;
+  font-weight: 800;
+  color: #111827;
+  line-height: 1.3;
+  margin-bottom: 2rem;
+}
+
+.report-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  max-width: 700px;
+  margin: 0 auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.report-meta-item {
+  display: flex;
+  flex-direction: column;
+  padding: 0.6rem 0.85rem;
+  background: #f9fafb;
+  border-right: 1px solid #e5e7eb;
+}
+
+.report-meta-item:nth-child(3n) {
+  border-right: none;
+}
+
+.report-meta-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.2rem;
+}
+
+.report-meta-value {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+/* Bölüm Başlıkları */
+.report-section-title {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #111827;
+  border-bottom: 2px solid #ede9fe;
+  padding-bottom: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.report-section-num {
+  color: #7c3aed;
+  font-variant-numeric: tabular-nums;
+  min-width: 1.8rem;
+}
+
+/* Özet kutusu */
+.report-abstract {
+  background: #f5f3ff;
+  border-left: 4px solid #7c3aed;
+  padding: 1rem 1.25rem;
+  border-radius: 0 8px 8px 0;
+  font-size: 0.92rem;
+  line-height: 1.7;
+  color: #1f2937;
+}
+
+/* Body text */
+.report-body-text {
+  font-size: 0.91rem;
+  line-height: 1.7;
+  color: #374151;
+  margin-bottom: 1rem;
+}
+
+/* Yöntem kartları */
+.report-method-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.report-method-card {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+}
+
+.report-method-title {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: #374151;
+  margin-bottom: 0.25rem;
+}
+
+.report-method-body {
+  font-size: 0.8rem;
+  color: #6b7280;
+  line-height: 1.5;
+}
+
+/* Alıntı kutusu (konu) */
+.report-blockquote {
+  border-left: 4px solid #7c3aed;
+  margin: 0;
+  padding: 1rem 1.5rem;
+  background: #faf5ff;
+  border-radius: 0 8px 8px 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #111827;
+  line-height: 1.5;
+  font-style: italic;
+}
+
+/* Rapor alt bilgisi */
+.report-footer {
+  margin-top: 3rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e5e7eb;
+  text-align: center;
+  font-size: 0.8rem;
+  color: #6b7280;
+}

@@ -1150,8 +1150,27 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Gönüllü Ayrılma (Masadan Kalkma)
+  socket.on('leave-session', ({ sessionCode, participantId }) => {
+    const code = sessionCode ? sessionCode.toUpperCase() : 'DEFAULT';
+    if (participantId) {
+      const removed = db.removeParticipant(code, participantId);
+      if (removed) {
+        const session = db.getSessionSync(code);
+        if (session) {
+          io.to(`moderator-${code}`).emit('participants-list', session.participants.filter(p => !p.isBanned).map(p => ({ id: p.id, nickname: p.nickname, justification: p.justification, isBot: p.isBot })));
+          io.to(`session-${code}`).emit('stats-update', { participantsCount: session.participants.filter(p => !p.isBanned).length });
+        }
+      }
+    }
+    socket.leave(`session-${code}`);
+  });
+
   socket.on('disconnect', () => {
     console.log(`Bağlantı kesildi: ${socket.id}`);
+    // Not: Bağlantı kesintisinde rumuz temizleme yapılmıyor.
+    // Çünkü kullanıcı sayfayı yenileyerek aynı oturumda geri dönebilir.
+    // Gönüllü çıkışlar leave-session event'i üzerinden yönetilir.
   });
 });
 
