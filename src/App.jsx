@@ -578,13 +578,15 @@ export default function App() {
             </>
           )}
 
-          <button 
-            onClick={handleOpenAdminPanel} 
-            className={`nav-btn ${role === 'admin' ? 'active' : ''}`}
-            style={{ borderColor: 'var(--color-primary)', color: 'var(--color-primary)' }}
-          >
-            <Shield size={16} /> {t('navAdminPanel', lang)}
-          </button>
+          {role !== 'participant' && (
+            <button 
+              onClick={handleOpenAdminPanel} 
+              className={`nav-btn ${role === 'admin' ? 'active' : ''}`}
+              style={{ borderColor: 'var(--color-primary)', color: 'var(--color-primary)' }}
+            >
+              <Shield size={16} /> {t('navAdminPanel', lang)}
+            </button>
+          )}
 
           {/* Dil Değiştirici Butonları */}
           <div style={{ display: 'flex', gap: '0.25rem', borderLeft: '1px solid var(--border-light)', paddingLeft: '1rem', marginLeft: '0.5rem' }}>
