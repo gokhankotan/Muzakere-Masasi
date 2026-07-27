@@ -536,7 +536,7 @@ class Database {
 
     const statement = {
       id: `s-${this.nextStatementId++}`,
-      text: text.trim().substring(0, 140),
+      text: text.trim().substring(0, 750),
       author: author || 'Misafir',
       timestamp: new Date(),
       approved,

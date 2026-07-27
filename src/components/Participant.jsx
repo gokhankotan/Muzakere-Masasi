@@ -232,7 +232,7 @@ export default function Participant({
             Bir Görüş Katkısında Bulun
           </h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1rem' }}>
-            Görüşünüz 140 karakterle sınırlıdır. Görüşünüzün yapıcı ve gerekçeli olmasına özen gösterin.
+            Görüşünüz 750 karakterle sınırlıdır. Görüşünüzün yapıcı ve gerekçeli olmasına özen gösterin.
           </p>
 
           <form onSubmit={handleOpinionSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -242,13 +242,13 @@ export default function Participant({
               placeholder="Benim fikrimce..."
               value={newOpinion}
               onChange={(e) => setNewOpinion(e.target.value)}
-              maxLength={140}
+              maxLength={750}
               required
             ></textarea>
             
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span className={`char-counter ${newOpinion.length > 120 ? 'warning' : ''}`}>
-                {newOpinion.length} / 140 karakter
+              <span className={`char-counter ${newOpinion.length > 700 ? 'warning' : ''}`}>
+                {newOpinion.length} / 750 karakter
               </span>
               <button type="submit" className="btn" disabled={!newOpinion.trim()}>
                 <Send size={16} /> Gönder (Onaya Git)
