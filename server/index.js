@@ -435,7 +435,7 @@ app.patch('/api/sessions/:code/opinions/:id/status', requireSessionOwnership, as
 });
 
 // 8. Sonuç Raporu (JSON)
-app.get('/api/sessions/:code/report', async (req, res) => {
+app.get('/api/sessions/:code/report', checkParticipantAccess, async (req, res) => {
   const { code } = req.params;
   const upperCode = code.toUpperCase();
 
@@ -468,7 +468,7 @@ app.get('/api/sessions/:code/report', async (req, res) => {
 });
 
 // 8.1. CSV İhracatı (Oylama Matrisi)
-app.get('/api/sessions/:code/export/csv', async (req, res) => {
+app.get('/api/sessions/:code/export/csv', checkParticipantAccess, async (req, res) => {
   const { code } = req.params;
   const upperCode = code.toUpperCase();
 
@@ -894,14 +894,29 @@ io.on('connection', (socket) => {
   });
 
   // Odaya Katılma
-  socket.on('join-session', ({ sessionCode }, callback) => {
+  socket.on('join-session', ({ sessionCode, token }, callback) => {
     const code = sessionCode ? sessionCode.toUpperCase() : 'DEFAULT';
-    socket.join(`session-${code}`);
 
     const session = db.getSessionSync(code);
     if (!session) {
       return callback && callback({ success: false, message: 'Oturum bulunamadı.' });
     }
+
+    if (session.visibility === 'PASSWORD_PROTECTED') {
+      const authResult = verifySessionToken(token, code);
+      if (!authResult.isValid) {
+        socket.emit('session-state', {
+          code: session.code,
+          visibility: session.visibility,
+          status: session.status,
+          participantsCount: session.participants.filter(p => !p.isBanned).length
+        });
+        if (callback) callback({ success: false, message: 'Şifre doğrulama gerekli.', passwordRequired: true });
+        return;
+      }
+    }
+
+    socket.join(`session-${code}`);
 
     socket.emit('session-state', {
       question: session.question,

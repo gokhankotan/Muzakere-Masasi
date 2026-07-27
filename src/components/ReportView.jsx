@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Printer, ArrowLeft, Download, FileSpreadsheet } from "lucide-react";
 import { t } from "../i18n";
 
@@ -9,7 +9,12 @@ export default function ReportView({ onBack, sessionCode, lang = "tr" }) {
 
   useEffect(() => {
     const code = sessionCode || "DEFAULT";
-    fetch(`/api/sessions/${code}/report`)
+    const token = localStorage.getItem(`session_token_${code}`) ||
+                  localStorage.getItem(`moderator_token_${code}`) ||
+                  localStorage.getItem("admin_token");
+    fetch(`/api/sessions/${code}/report`, {
+      headers: token ? { "Authorization": `Bearer ${token}` } : {}
+    })
       .then(res => res.json())
       .then(data => { setReportData(data); setLoading(false); })
       .catch(err => { console.error("Rapor yükleme hatası:", err); setLoading(false); });
@@ -65,9 +70,18 @@ export default function ReportView({ onBack, sessionCode, lang = "tr" }) {
           <ArrowLeft size={16} /> {lang === "tr" ? "Geri Dön" : "Back"}
         </button>
         <div style={{ display: "flex", gap: "0.6rem" }}>
-          <a href={`/api/sessions/${sessionCode || "DEFAULT"}/export/csv`} className="btn" style={{ border: "1px solid #059669", color: "#059669", textDecoration: "none", display: "flex", alignItems: "center", gap: "0.4rem", background: "transparent", padding: "0.45rem 0.9rem", borderRadius: "8px", fontSize: "0.85rem" }} download>
-            <Download size={14} /> CSV
-          </a>
+          {(() => {
+            const code = sessionCode || "DEFAULT";
+            const token = localStorage.getItem(`session_token_${code}`) ||
+                          localStorage.getItem(`moderator_token_${code}`) ||
+                          localStorage.getItem("admin_token");
+            const csvUrl = `/api/sessions/${code}/export/csv${token ? `?token=${encodeURIComponent(token)}` : ""}`;
+            return (
+              <a href={csvUrl} className="btn" style={{ border: "1px solid #059669", color: "#059669", textDecoration: "none", display: "flex", alignItems: "center", gap: "0.4rem", background: "transparent", padding: "0.45rem 0.9rem", borderRadius: "8px", fontSize: "0.85rem" }} download>
+                <Download size={14} /> CSV
+              </a>
+            );
+          })()}
           <button onClick={handleExportJSON} className="btn" style={{ border: "1px solid #2563eb", color: "#2563eb", background: "transparent", display: "flex", alignItems: "center", gap: "0.4rem" }}>
             <FileSpreadsheet size={14} /> JSON
           </button>

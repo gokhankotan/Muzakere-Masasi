@@ -213,7 +213,10 @@ export default function App() {
           });
         }
 
-        socket.emit('join-session', { sessionCode: parsed.sessionCode || 'DEFAULT' });
+        const savedToken = localStorage.getItem(`session_token_${parsed.sessionCode || 'DEFAULT'}`) ||
+                           modToken ||
+                           localStorage.getItem('admin_token');
+        socket.emit('join-session', { sessionCode: parsed.sessionCode || 'DEFAULT', token: savedToken });
         setRole('participant');
       } catch {
         localStorage.removeItem('muzakere_participant');
@@ -229,7 +232,7 @@ export default function App() {
   const handleJoinSession = ({ sessionCode, nickname, justification, isModerator: isModFlag, token }) => {
     const code = (sessionCode || 'DEFAULT').toUpperCase();
 
-    socketRef.current.emit('join-session', { sessionCode: code });
+    socketRef.current.emit('join-session', { sessionCode: code, token });
     socketRef.current.emit('register-participant', { sessionCode: code, nickname, justification }, (res) => {
       if (res.success) {
         const newPart = {
@@ -415,7 +418,12 @@ export default function App() {
   // JSON Rapor İndirme
   const handleDownloadReport = async () => {
     try {
-      const res = await fetch(`/api/sessions/${activeSessionCode}/report`);
+      const token = localStorage.getItem(`session_token_${activeSessionCode}`) ||
+                    localStorage.getItem(`moderator_token_${activeSessionCode}`) ||
+                    localStorage.getItem('admin_token');
+      const res = await fetch(`/api/sessions/${activeSessionCode}/report`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
       const data = await res.json();
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
