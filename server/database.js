@@ -384,31 +384,6 @@ class Database {
 
     this.sessions.set(sessionCode, session);
 
-    if (!skipDefaultStatements) {
-      // Varsayılan ifadeleri ekle
-      const defaultStatements = [
-        { text: 'Motorlu araç şeritleri daraltılarak korumalı bisiklet ve scooter yolları genişletilmelidir.', author: 'Arda (Bisiklet Derneği)', approved: true },
-        { text: 'Esnafın mal indirip bindirmesi ve ticaretin aksamaması için caddedeki otopark alanları korunmalıdır.', author: 'Melis (Esnaf Odası)', approved: true },
-        { text: "E-scooter'lar kaldırımlarda yürüyen yayalara büyük tehlike oluşturuyor, kaldırımlarda kullanımı tamamen yasaklanmalı.", author: 'Can (Yaya Hakları)', approved: true },
-        { text: 'Şehir merkezine özel araçla girişler Londra modeli gibi ücretli ve kısıtlı hale getirilmelidir.', author: 'Selin (Şehir Plancısı)', approved: true },
-        { text: 'Bisiklet yolları yapmak yerine yaya kaldırımları genişletilmeli ve ağaçlandırılmalıdır.', author: 'Ahmet (Mahalle Sakini)', approved: true },
-        { text: "Scooter'ların azami hız sınırı saatte 15 km'ye düşürülmeli ve kask kullanımı zorunlu olmalıdır.", author: 'Derya (Güvenlik Uzmanı)', approved: true },
-        { text: 'Araç hızı şehir içi tüm ara sokaklarda saatte 30 km ile sınırlandırılmalıdır.', author: 'Emre (Trafik Mühendisi)', approved: true },
-        { text: 'Toplu taşıma hatları (metro, metrobüs) 24 saat kesintisiz ve sübvanse edilerek çok ucuz hale getirilmelidir.', author: 'Gamze (Öğrenci)', approved: true }
-      ];
-
-      defaultStatements.forEach(s => {
-        const statement = {
-          id: `s-${Math.random().toString(36).substring(2, 9)}`,
-          text: s.text,
-          author: s.author,
-          timestamp: new Date(),
-          approved: s.approved
-        };
-        session.statements.push(statement);
-      });
-    }
-
     // Veritabanına asenkron yaz
     if (this.isPrismaActive) {
       this.prisma.session.create({
