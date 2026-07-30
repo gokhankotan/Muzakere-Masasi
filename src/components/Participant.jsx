@@ -2,7 +2,11 @@ import React, { useState } from 'react';
 import { Send, ThumbsUp, ThumbsDown, EyeOff, MapPin, Sparkles, ShieldCheck, Check, X, Lock, Globe, ChevronDown, ChevronUp } from 'lucide-react';
 import { t } from '../i18n';
 
-const CAMP_COLORS = ["#FF5733", "#33FF57", "#3357FF"];
+const getCampColor = (campId, totalCamps) => {
+  const K = totalCamps && totalCamps > 0 ? totalCamps : 3;
+  const hue = Math.round((360 / K) * (campId % K));
+  return `hsl(${hue}, 75%, 50%)`;
+};
 
 export default function Participant({ 
   participant, 
@@ -355,7 +359,7 @@ export default function Participant({
                   cx={200 + camp.x * 2}
                   cy={200 - camp.y * 2}
                   r={camp.size > 0 ? 35 : 0}
-                  fill={CAMP_COLORS[camp.id] || '#fff'}
+                  fill={getCampColor(camp.id, camps.length)}
                   opacity={0.08}
                 />
               ))}
@@ -387,7 +391,7 @@ export default function Participant({
                       cx={cx}
                       cy={cy}
                       r={pt.isBot ? 4 : 5.5}
-                      fill={CAMP_COLORS[pt.campId] || '#999'}
+                      fill={getCampColor(pt.campId, camps.length)}
                       className="chart-point"
                       opacity={pt.isBot ? 0.65 : 0.9}
                     />
@@ -403,7 +407,7 @@ export default function Participant({
                     cy={200 - myPoint.y * 2}
                     r={8}
                     fill="#ffffff"
-                    stroke={CAMP_COLORS[myPoint.campId] || '#a855f7'}
+                    stroke={getCampColor(myPoint.campId, camps.length)}
                     strokeWidth={2}
                     className="chart-point-self"
                   />
@@ -503,7 +507,7 @@ export default function Participant({
           {myCamp ? (
             <div style={{ textAlign: 'center' }}>
               <p style={{ fontSize: '0.95rem', fontWeight: 600 }}>
-                {t('partMapStatusCalculated', lang)} <span style={{ color: CAMP_COLORS[myCamp.id] }}>{myCamp.name}</span>
+                {t('partMapStatusCalculated', lang)} <span style={{ color: getCampColor(myCamp.id, camps.length) }}>{myCamp.name}</span>
               </p>
               {myCamp.summary && (
                 <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.4rem', fontStyle: 'italic' }}>
@@ -525,7 +529,7 @@ export default function Participant({
         <div className="chart-legend">
           {camps.map((camp, idx) => (
             <div key={idx} className="legend-item">
-              <span className="legend-dot" style={{ backgroundColor: CAMP_COLORS[camp.id] }}></span>
+              <span className="legend-dot" style={{ backgroundColor: getCampColor(camp.id, camps.length) }}></span>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                 {camp.name} ({camp.size} {lang === 'tr' ? 'kişi' : 'people'})
               </span>

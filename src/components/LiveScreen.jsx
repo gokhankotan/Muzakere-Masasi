@@ -2,7 +2,11 @@ import React, { useState } from 'react';
 import { Users, FileText, Split, CheckCircle2, AlertCircle } from 'lucide-react';
 import { t } from '../i18n';
 
-const CAMP_COLORS = ["#FF5733", "#33FF57", "#3357FF"];
+const getCampColor = (campId, totalCamps) => {
+  const K = totalCamps && totalCamps > 0 ? totalCamps : 3;
+  const hue = Math.round((360 / K) * (campId % K));
+  return `hsl(${hue}, 75%, 50%)`;
+};
 
 export default function LiveScreen({ question, analysis, stats, status = 'active', lang = 'tr' }) {
   const [hoveredPoint, setHoveredPoint] = useState(null);
@@ -65,7 +69,7 @@ export default function LiveScreen({ question, analysis, stats, status = 'active
                 fontSize: '0.8rem',
                 textAlign: 'left'
               }}>
-                <div style={{ fontWeight: 'bold', color: CAMP_COLORS[hoveredPoint.campId] || 'var(--color-primary)', display: 'flex', justifyContent: 'space-between' }}>
+                <div style={{ fontWeight: 'bold', color: getCampColor(hoveredPoint.campId, camps.length), display: 'flex', justifyContent: 'space-between' }}>
                   <span>{hoveredPoint.nickname}</span>
                   <span style={{ fontSize: '0.7rem', opacity: 0.7 }}>{hoveredPoint.isBot ? 'Bot' : (lang === 'tr' ? 'Katılımcı' : 'Participant')}</span>
                 </div>
@@ -143,7 +147,7 @@ export default function LiveScreen({ question, analysis, stats, status = 'active
                     cx={200 + camp.x * 2}
                     cy={200 - camp.y * 2}
                     r={camp.size > 0 ? 40 : 0}
-                    fill={CAMP_COLORS[camp.id]}
+                    fill={getCampColor(camp.id, camps.length)}
                     opacity={0.08}
                   />
                 ))}
@@ -176,7 +180,7 @@ export default function LiveScreen({ question, analysis, stats, status = 'active
                       cx={cx}
                       cy={cy}
                       r={pt.isBot ? 4 : 6}
-                      fill={CAMP_COLORS[pt.campId] || '#999'}
+                      fill={getCampColor(pt.campId, camps.length)}
                       className="chart-point"
                       opacity={pt.isBot ? 0.7 : 0.95}
                       onMouseEnter={() => setHoveredPoint(pt)}
@@ -197,7 +201,7 @@ export default function LiveScreen({ question, analysis, stats, status = 'active
                         cx={cx}
                         cy={cy}
                         r={10}
-                        fill={CAMP_COLORS[camp.id]}
+                        fill={getCampColor(camp.id, camps.length)}
                         stroke="#fff"
                         strokeWidth={1.5}
                         style={{ filter: 'drop-shadow(0 2px 5px rgba(0,0,0,0.5))' }}
@@ -301,9 +305,10 @@ export default function LiveScreen({ question, analysis, stats, status = 'active
             {camps.map((camp, idx) => {
               if (camp.size === 0) return null;
               const campLetter = String.fromCharCode(65 + camp.id);
+              const campColor = getCampColor(camp.id, camps.length);
               return (
-                <div key={idx} style={{ borderLeft: `3px solid ${CAMP_COLORS[camp.id]}`, paddingLeft: '0.75rem' }}>
-                  <div style={{ fontWeight: 'bold', fontSize: '0.9rem', color: CAMP_COLORS[camp.id] }}>
+                <div key={idx} style={{ borderLeft: `3px solid ${campColor}`, paddingLeft: '0.75rem' }}>
+                  <div style={{ fontWeight: 'bold', fontSize: '0.9rem', color: campColor }}>
                     {lang === 'tr' ? `Grup ${campLetter}` : `Cluster ${campLetter}`} ({camp.size} {lang === 'tr' ? 'Katılımcı' : 'Participants'})
                   </div>
                   {camp.topStatements && camp.topStatements.length > 0 ? (
