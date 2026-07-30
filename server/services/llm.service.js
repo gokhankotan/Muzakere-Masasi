@@ -22,6 +22,19 @@ const apiKey = process.env.LLM_API_KEY ? process.env.LLM_API_KEY.replace(/['"]/g
 const baseURL = process.env.LLM_BASE_URL ? process.env.LLM_BASE_URL.replace(/['"]/g, '').trim() : undefined;
 const modelName = process.env.LLM_MODEL_NAME ? process.env.LLM_MODEL_NAME.replace(/['"]/g, '').trim() : 'gpt-3.5-turbo';
 
+/**
+ * Qwen/DeepSeek gibi "düşünen" modellerin yanıtından <think>...</think>
+ * bloklarını ve boş satırları temizler.
+ */
+function cleanLLMOutput(text) {
+  if (!text) return '';
+  return text
+    .replace(/<think>[\s\S]*?<\/think>/gi, '')
+    .replace(/^[\s\n]+/, '')
+    .replace(/[\s\n]+$/, '')
+    .trim();
+}
+
 let openaiClient = null;
 
 if (apiKey) {
@@ -105,7 +118,8 @@ Notlar:
       temperature: 0.5,
     });
 
-    const summary = response.choices[0]?.message?.content?.trim();
+    const raw = response.choices[0]?.message?.content?.trim();
+    const summary = cleanLLMOutput(raw);
     if (summary) {
       return summary;
     }
@@ -268,9 +282,10 @@ Notlar:
       temperature: 0.3,
     });
 
-    const label = response.choices[0]?.message?.content?.trim();
+    const raw = response.choices[0]?.message?.content?.trim();
+    const label = cleanLLMOutput(raw).replace(/^"|"$/g, '');
     if (label) {
-      return label.replace(/^"|"$/g, '');
+      return label;
     }
     throw new Error('LLM boş yanıt döndürdü.');
   } catch (err) {
