@@ -37,7 +37,8 @@ export default function Lobby({ question, onJoin, participantsCount, lang = 'tr'
 
       if (!res.ok) {
         if (data.passwordRequired) {
-          return setError(lang === 'tr' ? 'Bu masaya erişmek için geçerli bir şifre girmelisiniz.' : 'You must enter a valid password to access this table.');
+          setJoinVisibility('PASSWORD_PROTECTED');
+          return setError(lang === 'tr' ? 'Bu masa şifrelidir. Lütfen aşağıya şifreyi giriniz.' : 'This table is password protected. Please enter the password below.');
         }
         return setError(data.message || (lang === 'tr' ? 'Giriş yapılamadı.' : 'Failed to join.'));
       }

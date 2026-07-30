@@ -361,12 +361,21 @@ class Database {
   }
 
   getSessionSync(code) {
-    return this.sessions.get(code) || null;
+    if (!code) return null;
+    const upperCode = String(code).trim().toUpperCase();
+    return this.sessions.get(upperCode) || null;
   }
 
   async getSessionByCode(code) {
     await this.initialized;
-    return this.sessions.get(code) || null;
+    if (!code) return null;
+    const upperCode = String(code).trim().toUpperCase();
+    let session = this.sessions.get(upperCode);
+    if (!session && this.isPrismaActive) {
+      await this.loadSessionsFromDB();
+      session = this.sessions.get(upperCode);
+    }
+    return session || null;
   }
 
   createSessionSync({ code, title, description, question, visibility, passwordHash = null, passwordText = null, creatorId = null, skipDefaultStatements = false }) {
