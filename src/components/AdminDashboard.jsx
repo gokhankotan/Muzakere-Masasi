@@ -425,24 +425,6 @@ export default function AdminDashboard({
       {/* Sol Panel: Oturum ve Simülasyon Ayarları */}
       <div className="admin-left-col" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
         
-        {/* Canlı Yayın & Rapor Kontrolü */}
-        <div className="glass-panel" style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-          <button 
-            onClick={onOpenLiveScreen} 
-            className="btn" 
-            style={{ flex: 1, minWidth: '150px', background: 'var(--color-secondary)' }}
-          >
-            <Play size={16} /> {t('navLive', lang)}
-          </button>
-          <button 
-            onClick={onOpenReport} 
-            className="btn" 
-            style={{ flex: 1, minWidth: '150px', background: 'var(--color-primary)' }}
-          >
-            <FileText size={16} /> {t('navReport', lang)}
-          </button>
-        </div>
-
         {/* Masa Durumu Kontrolü */}
         <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           <h2 style={{ fontSize: '1.25rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
