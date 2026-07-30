@@ -46,10 +46,10 @@ export default function Participant({
     onSubmitStatement(newOpinion.trim(), (res) => {
       if (res.success) {
         setNewOpinion('');
-        setSubmitStatus('Görüşünüz moderasyon sırasına alındı! Moderatör onayladıktan sonra oylamaya açılacaktır.');
+        setSubmitStatus(t('partFormSubmitStatus', lang));
         setTimeout(() => setSubmitStatus(''), 5000);
       } else {
-        setSubmitStatus(`Hata: ${res.message}`);
+        setSubmitStatus(`${t('partFormSubmitError', lang)} ${res.message}`);
       }
     });
   };
@@ -65,7 +65,7 @@ export default function Participant({
     setAccessError('');
     const moderatorToken = localStorage.getItem(`moderator_token_${sessionCode}`);
     if (!moderatorToken) {
-      return setAccessError('Moderatör token bulunamadı. Lütfen yeniden giriş yapın.');
+      return setAccessError(t('partModTokenError', lang));
     }
     try {
       const res = await fetch(`/api/sessions/${sessionCode}/password`, {
@@ -77,12 +77,12 @@ export default function Participant({
         body: JSON.stringify({ visibility: accessVisibility, password: accessPassword })
       });
       const data = await res.json();
-      if (!res.ok) return setAccessError(data.message || 'Güncelleme başarısız.');
-      setAccessMsg('Erişim ayarları başarıyla güncellendi!');
+      if (!res.ok) return setAccessError(data.message || t('partModUpdateFailed', lang));
+      setAccessMsg(t('partModAccessSuccess', lang));
       setAccessPassword('');
       setTimeout(() => setAccessMsg(''), 4000);
     } catch {
-      setAccessError('Bağlantı hatası oluştu.');
+      setAccessError(t('partModConnError', lang));
     }
   };
 
@@ -111,9 +111,9 @@ export default function Participant({
             >
               <h2 style={{ fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-primary)' }}>
                 <ShieldCheck size={18} />
-                Moderatör Kontrol Paneli
+                {t('partModPanel', lang)}
                 <span style={{ background: 'rgba(29, 78, 216, 0.1)', border: '1px solid rgba(29, 78, 216, 0.2)', borderRadius: '999px', padding: '0.1rem 0.6rem', fontSize: '0.7rem', color: 'var(--color-secondary)' }}>
-                  {(moderationQueue || []).length} bekleyen
+                  {(moderationQueue || []).length} {t('partModQueue', lang)}
                 </span>
               </h2>
               {modPanelOpen ? <ChevronUp size={16} color="var(--color-secondary)" /> : <ChevronDown size={16} color="var(--color-secondary)" />}
@@ -134,11 +134,11 @@ export default function Participant({
                 {/* Bekleyen Görüşler Kuyruğu */}
                 <div style={{ marginBottom: '1.5rem' }}>
                   <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.75rem', fontWeight: 600 }}>
-                    📋 BEKLEYEN GÖRÜŞLER
+                    {t('partModPendingTitle', lang)}
                   </p>
                   {(moderationQueue || []).length === 0 ? (
                     <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                      Onay bekleyen görüş bulunmuyor.
+                      {t('partModPendingEmpty', lang)}
                     </p>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -151,7 +151,7 @@ export default function Participant({
                         }}>
                           <p style={{ fontSize: '0.85rem', marginBottom: '0.25rem' }}>"{opinion.text}"</p>
                           <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.6rem' }}>
-                            Yazan: {opinion.author}
+                            {t('partModAuthorLabel', lang)} {opinion.author}
                           </p>
                           <div style={{ display: 'flex', gap: '0.5rem' }}>
                             <button 
@@ -159,14 +159,14 @@ export default function Participant({
                               className="btn btn-agree" 
                               style={{ flex: 1, padding: '0.35rem 0.5rem', fontSize: '0.78rem' }}
                             >
-                              <Check size={14} /> Onayla
+                              <Check size={14} /> {t('partBtnApprove', lang)}
                             </button>
                             <button 
                               onClick={() => onRejectStatement(opinion.id)}
                               className="btn btn-disagree" 
                               style={{ flex: 1, padding: '0.35rem 0.5rem', fontSize: '0.78rem' }}
                             >
-                              <X size={14} /> Reddet
+                              <X size={14} /> {t('partBtnReject', lang)}
                             </button>
                           </div>
                         </div>
@@ -178,7 +178,7 @@ export default function Participant({
                 {/* Masa Erişim Ayarları */}
                 <div>
                   <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.75rem', fontWeight: 600 }}>
-                    🔒 MASA ERİŞİM AYARLARI
+                    {t('partModAccessTitle', lang)}
                   </p>
 
                   {visibility === 'PASSWORD_PROTECTED' && passwordText && (
@@ -205,15 +205,15 @@ export default function Participant({
                       onChange={(e) => setAccessVisibility(e.target.value)}
                       style={{ background: 'var(--bg-card)', color: 'var(--text-main)', fontSize: '0.85rem', padding: '0.5rem' }}
                     >
-                      <option value="PUBLIC">🌐 Herkese Açık (Şifresiz)</option>
-                      <option value="PASSWORD_PROTECTED">🔒 Şifre Korumalı</option>
+                      <option value="PUBLIC">{t('lobbyVisibilityPublic', lang)}</option>
+                      <option value="PASSWORD_PROTECTED">{t('lobbyVisibilityPrivate', lang)}</option>
                     </select>
 
                     {accessVisibility === 'PASSWORD_PROTECTED' && (
                       <input 
                         type="password"
                         className="form-input"
-                        placeholder="Yeni masa şifresi..."
+                        placeholder={t('partModNewPassPlaceholder', lang)}
                         value={accessPassword}
                         onChange={(e) => setAccessPassword(e.target.value)}
                         style={{ fontSize: '0.85rem', padding: '0.5rem' }}
@@ -221,7 +221,7 @@ export default function Participant({
                     )}
 
                     <button type="submit" className="btn btn-secondary" style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem', borderColor: 'var(--color-secondary)', color: 'var(--color-secondary)' }}>
-                      Erişim Ayarlarını Kaydet
+                      {t('partModAccessSave', lang)}
                     </button>
                   </form>
                 </div>
@@ -234,17 +234,17 @@ export default function Participant({
         <div className="glass-panel">
           <h2 style={{ fontSize: '1.25rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <Sparkles size={18} className="text-secondary" />
-            Bir Görüş Katkısında Bulun
+            {t('partFormSubmitTitle', lang)}
           </h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1rem' }}>
-            Görüşünüz 750 karakterle sınırlıdır. Görüşünüzün yapıcı ve gerekçeli olmasına özen gösterin.
+            {t('partFormSubmitDesc', lang)}
           </p>
 
           <form onSubmit={handleOpinionSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <textarea
               className="form-textarea"
               rows={3}
-              placeholder="Benim fikrimce..."
+              placeholder={t('partFormSubmitPlaceholder', lang)}
               value={newOpinion}
               onChange={(e) => setNewOpinion(e.target.value)}
               maxLength={750}
@@ -253,10 +253,10 @@ export default function Participant({
             
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span className={`char-counter ${newOpinion.length > 700 ? 'warning' : ''}`}>
-                {newOpinion.length} / 750 karakter
+                {newOpinion.length} / 750 {t('partCharCounter', lang)}
               </span>
               <button type="submit" className="btn" disabled={!newOpinion.trim()}>
-                <Send size={16} /> Gönder (Onaya Git)
+                <Send size={16} /> {t('partFormSubmitBtn', lang)}
               </button>
             </div>
           </form>
@@ -281,8 +281,8 @@ export default function Participant({
             <>
               <div>
                 <div className="vote-card-header">
-                  <span>Görüş Oylama</span>
-                  <span>Kalan: {unvotedStatements.length} görüş</span>
+                  <span>{t('partVoteTitle', lang)}</span>
+                  <span>{t('partVoteLeft', lang, { count: unvotedStatements.length })}</span>
                 </div>
 
                 <div className="vote-card-content">
@@ -293,13 +293,13 @@ export default function Participant({
               <div>
                 <div className="vote-actions">
                   <button onClick={() => handleVoteAction(unvotedStatements[0].id, 1)} className="btn btn-agree">
-                    <ThumbsUp size={18} /> Katılıyorum
+                    <ThumbsUp size={18} /> {t('partVoteAgree', lang)}
                   </button>
                   <button onClick={() => handleVoteAction(unvotedStatements[0].id, -1)} className="btn btn-disagree">
-                    <ThumbsDown size={18} /> Katılmıyorum
+                    <ThumbsDown size={18} /> {t('partVoteDisagree', lang)}
                   </button>
                   <button onClick={() => handleVoteAction(unvotedStatements[0].id, 0)} className="btn btn-pass">
-                    <EyeOff size={18} /> Kararsız / Geç
+                    <EyeOff size={18} /> {t('partVotePass', lang)}
                   </button>
                 </div>
 
@@ -314,10 +314,10 @@ export default function Participant({
           ) : (
             <div className="empty-state" style={{ margin: 'auto' }}>
               <div className="empty-state-icon">🎉</div>
-              <h3>Tebrikler!</h3>
-              <p>Mevcut tüm görüşleri oyladınız.</p>
+              <h3>{t('partVoteSuccessTitle', lang)}</h3>
+              <p>{t('partVoteSuccessBody', lang)}</p>
               <p style={{ fontSize: '0.85rem' }}>
-                Yeni görüşler eklendiğinde burada belirecektir.
+                {t('partVoteSuccessNote', lang)}
               </p>
             </div>
           )}
