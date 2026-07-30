@@ -24,15 +24,50 @@ const modelName = process.env.LLM_MODEL_NAME ? process.env.LLM_MODEL_NAME.replac
 
 /**
  * Qwen/DeepSeek gibi "düşünen" modellerin yanıtından <think>...</think>
- * bloklarını ve boş satırları temizler.
+ * bloklarını, 'Thinking Process:' metinlerini ve numaralandırılmış analiz adımlarını temizler.
  */
 function cleanLLMOutput(text) {
   if (!text) return '';
-  return text
+  let cleaned = text
     .replace(/<think>[\s\S]*?<\/think>/gi, '')
-    .replace(/^[\s\n]+/, '')
-    .replace(/[\s\n]+$/, '')
     .trim();
+
+  // Düşünme adımlarını/bloklarını temizle
+  if (/^(Thinking Process:|1\.\s+\*\*|\*\*Thinking|\*\*Analyze|\d+\.\s+\*\*|\*\s+\*\*)/i.test(cleaned) || cleaned.includes('Thinking Process:')) {
+    // 1. Eğer markdown kod bloğu (```json ... ``` veya ``` ... ```) varsa doğrudan onu çıkar
+    const codeBlockMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+    if (codeBlockMatch && codeBlockMatch[1]) {
+      return codeBlockMatch[1].trim();
+    }
+
+    // 2. Paragrafları ayır ve düşünme süreci içermeyen paragrafları bul
+    const paragraphs = cleaned.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
+    const nonThinking = paragraphs.filter(p => 
+      !/^(Thinking Process|\d+\.|\*|\-|\#|\*\*Role|\*\*Input|\*\*Task|\*\*Constraints|\*\*Analyze|\*\*Output|\*\*Draft|\*\*Refining|\*\*Evaluation|\*\*Step|\*\*Data)/i.test(p) &&
+      !p.toLowerCase().includes('thinking process') &&
+      !p.includes('**Role:**') &&
+      !p.includes('**Input:**') &&
+      !p.includes('**Data:**')
+    );
+
+    if (nonThinking.length > 0) {
+      // Eğer en son paragraf temizse onu al
+      cleaned = nonThinking[nonThinking.length - 1];
+    } else {
+      // Tüm paragraflar düşünme adımı gibi görünüyorsa, son paragraftaki çift tırnaklı metni veya son satırı dene
+      const lastP = paragraphs[paragraphs.length - 1] || '';
+      const quoted = lastP.match(/"([^"]+)"/);
+      if (quoted && quoted[1]) {
+        cleaned = quoted[1];
+      } else {
+        const lines = lastP.split('\n').map(l => l.trim()).filter(Boolean);
+        const cleanLines = lines.filter(l => !l.startsWith('*') && !l.startsWith('-') && !/^\d+\./.test(l));
+        cleaned = cleanLines.length > 0 ? cleanLines[cleanLines.length - 1] : lastP;
+      }
+    }
+  }
+
+  return cleaned.replace(/^["']|["']$/g, '').trim();
 }
 
 let openaiClient = null;
@@ -219,8 +254,8 @@ Eğer görüş tamamen uygunsa:
 
     const content = response.choices[0]?.message?.content?.trim();
     
-    // JSON parse etmeye çalışalım, regex ile JSON bloklarını temizleyelim
-    let jsonStr = content;
+    // JSON parse etmeye çalışalım, regex ve cleanLLMOutput ile temizleyelim
+    let jsonStr = cleanLLMOutput(content);
     if (jsonStr.startsWith('```json')) {
       jsonStr = jsonStr.replace(/^```json/, '').replace(/```$/, '').trim();
     } else if (jsonStr.startsWith('```')) {
@@ -344,7 +379,7 @@ Kurallar:
       temperature: 0.1,
     });
 
-    const result = response.choices[0]?.message?.content?.trim();
+    const result = cleanLLMOutput(response.choices[0]?.message?.content?.trim());
     if (result) {
       return result;
     }
@@ -399,7 +434,7 @@ Kurallar:
       temperature: 0.5,
     });
 
-    const result = response.choices[0]?.message?.content?.trim();
+    const result = cleanLLMOutput(response.choices[0]?.message?.content?.trim());
     if (result) {
       return result;
     }
@@ -476,7 +511,7 @@ Kurallar:
       temperature: 0.3,
     });
 
-    let summary = response.choices[0]?.message?.content?.trim();
+    let summary = cleanLLMOutput(response.choices[0]?.message?.content?.trim());
     if (summary) {
       // Düşünme etiketlerini ve Thinking Process kısımlarını temizle
       summary = summary.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
