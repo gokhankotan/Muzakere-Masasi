@@ -44,7 +44,9 @@ export default function LiveScreen({ question, analysis, stats, status = 'active
         </h2>
         
         <div style={{ display: 'flex', justifyContent: 'center', margin: '1rem 0' }}>
-          <div className="chart-wrapper" style={{ maxWidth: '480px', width: '100%', position: 'relative' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', maxWidth: '540px', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', width: '100%', gap: '0.75rem' }}>
+              <div className="chart-wrapper" style={{ flex: 1, position: 'relative' }}>
             {hoveredPoint && (
               <div style={{
                 position: 'absolute',
@@ -162,39 +164,7 @@ export default function LiveScreen({ question, analysis, stats, status = 'active
                 <line x1="200" y1="0" x2="200" y2="400" className="chart-axis" />
                 <line x1="0" y1="200" x2="400" y2="200" className="chart-axis" />
 
-                {/* Eksen Etiketleri */}
-                {analysis?.axisLabels && (
-                  <g style={{ opacity: 0.95 }}>
-                    {/* X Eksen Etiketi (Sağ uçta) */}
-                    <g>
-                      <rect x="290" y="181" width="105" height="15" rx="3" fill="var(--color-primary)" />
-                      <text
-                        x="342.5"
-                        y="191"
-                        fill="#ffffff"
-                        fontSize="8.5"
-                        fontWeight="700"
-                        textAnchor="middle"
-                      >
-                        {analysis.axisLabels.x}
-                      </text>
-                    </g>
-                    {/* Y Eksen Etiketi (Üst uçta) */}
-                    <g>
-                      <rect x="150" y="5" width="100" height="15" rx="3" fill="var(--color-primary)" />
-                      <text
-                        x="200"
-                        y="15"
-                        fill="#ffffff"
-                        fontSize="8.5"
-                        fontWeight="700"
-                        textAnchor="middle"
-                      >
-                        {analysis.axisLabels.y}
-                      </text>
-                    </g>
-                  </g>
-                )}
+
 
                 {/* Katılımcı Noktaları */}
                 {points.map((pt) => {
@@ -272,7 +242,57 @@ export default function LiveScreen({ question, analysis, stats, status = 'active
               </div>
             )}
           </div>
+          {analysis?.axisLabels && !isInsufficient && (
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              padding: '0.6rem 0.8rem',
+              background: 'rgba(99, 102, 241, 0.08)',
+              border: '1px solid var(--border-light)',
+              borderRadius: '8px',
+              maxWidth: '130px',
+              textAlign: 'center',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+              gap: '0.2rem'
+            }}>
+              <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 'bold', letterSpacing: '0.05em' }}>
+                {lang === 'tr' ? 'Dikey Eksen (Y)' : 'Vertical Axis (Y)'}
+              </span>
+              <span style={{ fontSize: '0.82rem', fontWeight: '700', color: 'var(--color-primary-text)' }}>
+                {analysis.axisLabels.y}
+              </span>
+            </div>
+          )}
         </div>
+        {analysis?.axisLabels && !isInsufficient && (
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: '0.6rem 1rem',
+            background: 'rgba(99, 102, 241, 0.08)',
+            border: '1px solid var(--border-light)',
+            borderRadius: '8px',
+            textAlign: 'center',
+            width: '100%',
+            maxWidth: '480px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+            marginTop: '0.5rem',
+            gap: '0.2rem'
+          }}>
+            <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 'bold', letterSpacing: '0.05em' }}>
+              {lang === 'tr' ? 'Yatay Eksen (X)' : 'Horizontal Axis (X)'}
+            </span>
+            <span style={{ fontSize: '0.82rem', fontWeight: '700', color: 'var(--color-primary-text)' }}>
+              {analysis.axisLabels.x}
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
 
         {/* Kamp Bazlı Karakteristikler */}
         <div style={{ marginTop: '1rem' }}>
