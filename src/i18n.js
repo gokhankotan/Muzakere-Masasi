@@ -127,6 +127,15 @@ export const translations = {
     adminModalPassPlaceholder: "Şifreyi giriniz...",
     adminModalCancel: "İptal",
     adminModalSubmit: "Giriş Yap",
+    adminChangesLogTitle: "Yöneticilerin Son Değişiklikleri",
+    adminChangesLogEmpty: "Henüz kaydedilmiş bir değişiklik bulunmuyor.",
+    tabAnalysisReport: "Analiz Raporu",
+    tabSessionUserData: "Oturum-Kullanıcı Verisi",
+    colAction: "İşlem",
+    colUser: "Yönetici",
+    colTime: "Zaman",
+    colDetails: "Detaylar",
+    colSession: "Oturum Kodu",
 
     // Live Screen
     liveTitle: "Fikir Kümeleri Haritası",
@@ -293,6 +302,15 @@ export const translations = {
     adminModalPassPlaceholder: "Enter password...",
     adminModalCancel: "Cancel",
     adminModalSubmit: "Log In",
+    adminChangesLogTitle: "Admins' Recent Changes",
+    adminChangesLogEmpty: "No changes recorded yet.",
+    tabAnalysisReport: "Analysis Report",
+    tabSessionUserData: "Session-User Data",
+    colAction: "Action",
+    colUser: "Admin",
+    colTime: "Time",
+    colDetails: "Details",
+    colSession: "Session Code",
 
     // Live Screen
     liveTitle: "Opinion Clusters Map",

@@ -133,13 +133,6 @@ export default function Lobby({ question, onJoin, participantsCount, lang = 'tr'
           </div>
         </div>
 
-        {question && (
-          <div className="question-highlight-box">
-            <h3>{t('lobbyActiveQuestion', lang)}</h3>
-            <p>{question}</p>
-          </div>
-        )}
-
         <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '1rem' }}>
           <Award size={18} className="text-secondary" />
           <span>{lang === 'tr' ? `Şu anda aktif oturumlarda ` : `Currently `}<strong>{participantsCount || 0}</strong>{lang === 'tr' ? ` katılımcı bulunuyor.` : ` active participants in deliberation.`}</span>

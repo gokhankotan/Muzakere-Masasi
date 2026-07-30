@@ -7,8 +7,26 @@ class Database {
     this.isPrismaActive = false;
     this.sessions = new Map(); // code -> session object
     this.admins = new Map();   // email -> admin object (In-Memory admin deposu)
+    this.adminActions = [];    // Yöneticilerin son değişiklikleri günlüğü
     this.nextStatementId = 1;
     this.initialized = this.init();
+  }
+
+  logAdminAction(code, action, details, adminName = 'Yönetici') {
+    this.adminActions.unshift({
+      timestamp: new Date().toISOString(),
+      code: code || 'Sistem',
+      action,
+      details,
+      adminName
+    });
+    if (this.adminActions.length > 50) {
+      this.adminActions.pop();
+    }
+  }
+
+  getAdminActions() {
+    return this.adminActions || [];
   }
 
   async init() {
@@ -383,6 +401,7 @@ class Database {
     };
 
     this.sessions.set(sessionCode, session);
+    this.logAdminAction(sessionCode, 'CREATE_SESSION', `Oturum kuruldu: ${session.title}`);
 
     // Veritabanına asenkron yaz
     if (this.isPrismaActive) {
@@ -554,6 +573,7 @@ class Database {
     if (idx !== -1) {
       const statement = session.moderationQueue.splice(idx, 1)[0];
       statement.approved = true;
+      this.logAdminAction(sessionCode, 'APPROVE_OPINION', `Görüş onaylandı: "${statement.text.substring(0, 30)}..."`);
       session.statements.push(statement);
 
       if (this.isPrismaActive) {
@@ -577,6 +597,7 @@ class Database {
     if (idx !== -1) {
       const statement = session.moderationQueue.splice(idx, 1)[0];
       statement.approved = false;
+      this.logAdminAction(sessionCode, 'REJECT_OPINION', `Görüş reddedildi: "${statement.text.substring(0, 30)}..."`);
 
       if (this.isPrismaActive) {
         this.prisma.opinion.update({
@@ -596,6 +617,7 @@ class Database {
     if (!session) return;
 
     session.question = newQuestion;
+    this.logAdminAction(sessionCode, 'UPDATE_QUESTION', `Soru güncellendi: ${newQuestion}`);
 
     if (this.isPrismaActive) {
       this.prisma.session.update({
@@ -614,6 +636,7 @@ class Database {
     session.visibility = visibility;
     session.passwordHash = passwordHash;
     session.passwordText = passwordText;
+    this.logAdminAction(sessionCode, 'UPDATE_PASSWORD', `Erişim türü/şifre güncellendi: ${visibility}`);
     session.passwordUpdatedAt = new Date();
 
     if (this.isPrismaActive) {
@@ -643,6 +666,7 @@ class Database {
     if (passwordHash !== undefined) session.passwordHash = passwordHash;
     if (passwordText !== undefined) session.passwordText = passwordText;
     session.updatedAt = new Date();
+    this.logAdminAction(sessionCode, 'UPDATE_DETAILS', `Oturum ayarları güncellendi. Başlık: ${session.title}, Durum: ${session.status}, Erişim: ${session.visibility}`);
 
     if (this.isPrismaActive) {
       this.prisma.session.update({
@@ -765,6 +789,7 @@ class Database {
     session.statements = [];
     session.moderationQueue = [];
     session.participants = [];
+    this.logAdminAction(sessionCode, 'RESET_SESSION', `Oturum sıfırlandı ve arşivlendi.`);
     session.analysis = {
       points: [],
       camps: [],
@@ -805,6 +830,7 @@ class Database {
     if (!session) return;
 
     session.status = status;
+    this.logAdminAction(sessionCode, 'UPDATE_STATUS', `Oturum durumu güncellendi: ${status}`);
 
     if (this.isPrismaActive) {
       this.prisma.session.update({
@@ -889,6 +915,7 @@ class Database {
 
     // 1. Katılımcıyı banlı olarak işaretle (silme)
     participant.isBanned = true;
+    this.logAdminAction(sessionCode, 'KICK_PARTICIPANT', `Katılımcı engellendi: "${participant.nickname}"`);
 
     // 2. Katılımcının kendi verdiği oyları RAM'den temizle
     participant.votes = {};
@@ -936,6 +963,7 @@ class Database {
     if (isNaN(targetK) || targetK < 2 || targetK > 5) return false;
 
     session.targetK = targetK;
+    this.logAdminAction(sessionCode, 'UPDATE_CAMPS_COUNT', `Hedef kamp sayısı değiştirildi: ${targetK}`);
 
     if (this.isPrismaActive) {
       this.prisma.session.update({
@@ -957,6 +985,7 @@ class Database {
       session.customCampNames = {};
     }
     session.customCampNames[campId] = newName.trim();
+    this.logAdminAction(sessionCode, 'RENAME_CAMP', `Fikir kampı [${campId}] yeniden adlandırıldı: "${newName.trim()}"`);
 
     if (this.isPrismaActive) {
       this.prisma.session.update({

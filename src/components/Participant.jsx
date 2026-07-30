@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Send, ThumbsUp, ThumbsDown, EyeOff, MapPin, Sparkles, ShieldCheck, Check, X, Lock, Globe, ChevronDown, ChevronUp } from 'lucide-react';
+import { t } from '../i18n';
 
 const CAMP_COLORS = ["#FF5733", "#33FF57", "#3357FF"];
 
@@ -323,10 +324,10 @@ export default function Participant({
       <div className="chart-container glass-panel">
         <h2 style={{ fontSize: '1.25rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <MapPin size={18} className="text-secondary" />
-          Fikir Kampı Haritanız
+          {t('partMapTitle', lang)}
         </h2>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.5rem', textAlign: 'center' }}>
-          Oylama örüntülerinize göre masadaki diğer insanlarla olan konumunuz. Benzer oy verenler aynı kümede gruplanır.
+          {t('partMapDesc', lang)}
         </p>
 
         <div className="chart-wrapper">
@@ -335,11 +336,13 @@ export default function Participant({
               <line x1="200" y1="0" x2="200" y2="400" className="chart-axis" />
               <line x1="0" y1="200" x2="400" y2="200" className="chart-axis" />
               <text x="200" y="180" fill="#a78bfa" fontSize="28" textAnchor="middle">📊</text>
-              <text x="200" y="210" fill="#c4b5fd" fontSize="11" fontWeight="600" textAnchor="middle">
-                Analiz için yeterli veri yok
+              <text x="200" y="210" fill="var(--text-muted)" fontSize="11" fontWeight="600" textAnchor="middle">
+                {lang === 'tr' ? 'Analiz için yeterli veri yok' : 'Insufficient data for analysis'}
               </text>
-              <text x="200" y="230" fill="#7c3aed" fontSize="9.5" textAnchor="middle">
-                {`${analysis?.currentParticipants ?? 0} katılımcı, ${analysis?.currentOpinions ?? 0} görüş (min. 10 / 5 gerekli)`}
+              <text x="200" y="230" fill="var(--text-main)" fontSize="9.5" textAnchor="middle">
+                {lang === 'tr' 
+                  ? `${analysis?.currentParticipants ?? 0} katılımcı, ${analysis?.currentOpinions ?? 0} görüş (min. 10 / 5 gerekli)` 
+                  : `${analysis?.currentParticipants ?? 0} participants, ${analysis?.currentOpinions ?? 0} statements (min. 10 / 5 required)`}
               </text>
             </svg>
           ) : (
@@ -355,8 +358,55 @@ export default function Participant({
                 />
               ))}
 
+              {/* Grid Çizgileri */}
+              <line x1="100" y1="0" x2="100" y2="400" stroke="var(--border-light)" strokeWidth="0.5" strokeDasharray="3,3" opacity="0.4" />
+              <line x1="300" y1="0" x2="300" y2="400" stroke="var(--border-light)" strokeWidth="0.5" strokeDasharray="3,3" opacity="0.4" />
+              <line x1="0" y1="100" x2="400" y2="100" stroke="var(--border-light)" strokeWidth="0.5" strokeDasharray="3,3" opacity="0.4" />
+              <line x1="0" y1="300" x2="400" y2="300" stroke="var(--border-light)" strokeWidth="0.5" strokeDasharray="3,3" opacity="0.4" />
+
+              {/* Grid Koordinat İşaretleri */}
+              <text x="100" y="392" fill="var(--text-muted)" fontSize="7" opacity="0.6" textAnchor="middle">-50</text>
+              <text x="300" y="392" fill="var(--text-muted)" fontSize="7" opacity="0.6" textAnchor="middle">+50</text>
+              <text x="5" y="105" fill="var(--text-muted)" fontSize="7" opacity="0.6" textAnchor="start">+50</text>
+              <text x="5" y="305" fill="var(--text-muted)" fontSize="7" opacity="0.6" textAnchor="start">-50</text>
+
+              {/* Eksenler */}
               <line x1="200" y1="0" x2="200" y2="400" className="chart-axis" />
               <line x1="0" y1="200" x2="400" y2="200" className="chart-axis" />
+
+              {/* Eksen Etiketleri */}
+              {analysis?.axisLabels && (
+                <g style={{ opacity: 0.95 }}>
+                  {/* X Eksen Etiketi (Sağ uçta) */}
+                  <g>
+                    <rect x="290" y="181" width="105" height="15" rx="3" fill="var(--color-primary)" />
+                    <text
+                      x="342.5"
+                      y="191"
+                      fill="#ffffff"
+                      fontSize="8.5"
+                      fontWeight="700"
+                      textAnchor="middle"
+                    >
+                      {analysis.axisLabels.x}
+                    </text>
+                  </g>
+                  {/* Y Eksen Etiketi (Üst uçta) */}
+                  <g>
+                    <rect x="150" y="5" width="100" height="15" rx="3" fill="var(--color-primary)" />
+                    <text
+                      x="200"
+                      y="15"
+                      fill="#ffffff"
+                      fontSize="8.5"
+                      fontWeight="700"
+                      textAnchor="middle"
+                    >
+                      {analysis.axisLabels.y}
+                    </text>
+                  </g>
+                </g>
+              )}
 
               {renderPoints.map((pt) => {
                 const isMe = pt.id === participant.id;
@@ -392,13 +442,12 @@ export default function Participant({
                   <text
                     x={200 + myPoint.x * 2}
                     y={200 - myPoint.y * 2 - 12}
-                    fill="#ffffff"
+                    fill="var(--text-dark)"
                     fontSize="10"
                     fontWeight="bold"
                     textAnchor="middle"
-                    style={{ textShadow: '0 2px 4px #000' }}
                   >
-                    Siz ({participant.nickname})
+                    {lang === 'tr' ? `Siz (${participant.nickname})` : `You (${participant.nickname})`}
                   </text>
                 </g>
               )}
@@ -436,7 +485,7 @@ export default function Participant({
           {myCamp ? (
             <div style={{ textAlign: 'center' }}>
               <p style={{ fontSize: '0.95rem', fontWeight: 600 }}>
-                Şu anki Grubunuz: <span style={{ color: CAMP_COLORS[myCamp.id] }}>{myCamp.name}</span>
+                {t('partMapStatusCalculated', lang)} <span style={{ color: CAMP_COLORS[myCamp.id] }}>{myCamp.name}</span>
               </p>
               {myCamp.summary && (
                 <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.4rem', fontStyle: 'italic' }}>
@@ -444,12 +493,12 @@ export default function Participant({
                 </p>
               )}
               <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-                Bu gruptaki diğer {Math.max(0, myCamp.size - 1)} kişi ile benzer oylama örüntülerine sahipsiniz.
+                {t('partMapStatusCampSize', lang, { count: Math.max(0, myCamp.size - 1) })}
               </p>
             </div>
           ) : (
             <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textAlign: 'center' }}>
-              Konumunuzun hesaplanması için en az 3 katılımcının oylamaya başlaması gerekir.
+              {t('partMapStatusWait', lang)}
             </p>
           )}
         </div>
@@ -460,7 +509,7 @@ export default function Participant({
             <div key={idx} className="legend-item">
               <span className="legend-dot" style={{ backgroundColor: CAMP_COLORS[camp.id] }}></span>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                {camp.name} ({camp.size} kişi)
+                {camp.name} ({camp.size} {lang === 'tr' ? 'kişi' : 'people'})
               </span>
             </div>
           ))}
@@ -471,7 +520,7 @@ export default function Participant({
           className="btn btn-secondary" 
           style={{ marginTop: '2rem', padding: '0.4rem 1rem', fontSize: '0.8rem' }}
         >
-          Masadan Kalk / Oturumu Kapat
+          {t('partLogout', lang)}
         </button>
       </div>
     </div>

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { HelpCircle, Users, Check, X, Settings, FileText, Play, Shield, AlertTriangle, RefreshCw, Send } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { HelpCircle, Users, Check, X, Settings, FileText, Play, Shield, AlertTriangle, RefreshCw, Send, Sparkles } from 'lucide-react';
 import { t } from '../i18n';
 
 export default function AdminDashboard({ 
@@ -31,6 +31,36 @@ export default function AdminDashboard({
   const [simCount, setSimCount] = useState(100);
   const [simStatus, setSimStatus] = useState('');
   const [resetConfirm, setResetConfirm] = useState(false);
+  const [actionLogs, setActionLogs] = useState([]);
+  
+  // Uzlaşı Potansiyeli Keşif State'leri
+  const [consensusResult, setConsensusResult] = useState('');
+  const [consensusError, setConsensusError] = useState('');
+  const [discoveringConsensus, setDiscoveringConsensus] = useState(false);
+
+  const fetchActionLogs = () => {
+    const token = localStorage.getItem('admin_token');
+    if (!token) return;
+    fetch('/api/admin/action-log', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        setActionLogs(data.logs || []);
+      }
+    })
+    .catch(err => console.error('Action log load error:', err));
+  };
+
+  useEffect(() => {
+    fetchActionLogs();
+    const interval = setInterval(fetchActionLogs, 5000);
+    // Oturum değiştiğinde uzlaşı keşif panelini sıfırla
+    setConsensusResult('');
+    setConsensusError('');
+    return () => clearInterval(interval);
+  }, [activeSessionCode]);
 
   // Kamp ismi düzenleme state'leri
   const [editingCampId, setEditingCampId] = useState(null);
@@ -142,6 +172,33 @@ export default function AdminDashboard({
         alert(`Sıfırlama hatası: ${res.message}`);
       }
     });
+  };
+
+  const handleDiscoverConsensus = async () => {
+    setConsensusError('');
+    setConsensusResult('');
+    setDiscoveringConsensus(true);
+
+    const token = localStorage.getItem('admin_token') || localStorage.getItem(`moderator_token_${activeSessionCode}`);
+    try {
+      const res = await fetch(`/api/sessions/${activeSessionCode}/discover-consensus`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+      if (data.success) {
+        setConsensusResult(data.consensusPotential);
+      } else {
+        setConsensusError(data.message || (lang === 'tr' ? 'Uzlaşı potansiyeli keşfedilemedi.' : 'Failed to discover consensus.'));
+      }
+    } catch (err) {
+      setConsensusError(lang === 'tr' ? 'Şu an uzlaşı potansiyeli analiz edilemedi.' : 'Currently unable to analyze consensus potential.');
+    } finally {
+      setDiscoveringConsensus(false);
+    }
   };
 
   return (
@@ -291,7 +348,7 @@ export default function AdminDashboard({
                         }}
                         title={lang === 'tr' ? 'Yönetmek için bu oturumu seç' : 'Select this session to manage'}
                       >
-                        {s.code} {activeSessionCode === s.code ? '⭐️' : ''}
+                        {s.code} {s.passwordText ? ` (${lang === 'tr' ? 'Şifre' : 'Pass'}: ${s.passwordText})` : ''} {activeSessionCode === s.code ? '⭐️' : ''}
                       </button>
                     </td>
                     <td style={{ padding: '0.75rem', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={s.question}>{s.question}</td>
@@ -321,6 +378,45 @@ export default function AdminDashboard({
         ) : (
           <p style={{ fontStyle: 'italic', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
             {lang === 'tr' ? 'Yükleniyor veya gösterilecek veri yok.' : 'Loading or no data available.'}
+          </p>
+        )}
+      </div>
+
+      {/* Yöneticilerin Son Değişiklikleri Günlüğü */}
+      <div className="glass-panel" style={{ width: '100%', marginTop: '1rem' }}>
+        <h2 style={{ fontSize: '1.25rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          📋 {t('adminChangesLogTitle', lang)}
+        </h2>
+        {actionLogs && actionLogs.length > 0 ? (
+          <div style={{ overflowX: 'auto', maxHeight: '250px' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', textAlign: 'left' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--border-light)', color: 'var(--color-primary)' }}>
+                  <th style={{ padding: '0.5rem' }}>{t('colTime', lang)}</th>
+                  <th style={{ padding: '0.5rem' }}>{t('colSession', lang)}</th>
+                  <th style={{ padding: '0.5rem' }}>{t('colUser', lang)}</th>
+                  <th style={{ padding: '0.5rem' }}>{t('colAction', lang)}</th>
+                  <th style={{ padding: '0.5rem' }}>{t('colDetails', lang)}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {actionLogs.map((log, idx) => (
+                  <tr key={idx} style={{ borderBottom: '1px solid var(--border-light)', opacity: 0.9 }}>
+                    <td style={{ padding: '0.5rem', whiteSpace: 'nowrap' }}>{new Date(log.timestamp).toLocaleString(lang === 'tr' ? 'tr-TR' : 'en-US')}</td>
+                    <td style={{ padding: '0.5rem', fontWeight: 'bold' }}>{log.code}</td>
+                    <td style={{ padding: '0.5rem' }}>{log.adminName}</td>
+                    <td style={{ padding: '0.5rem' }}>
+                      <span className={`badge badge-secondary`} style={{ background: 'var(--color-primary-glow)', color: 'var(--color-primary)', border: '1px solid var(--border-light)' }}>{log.action}</span>
+                    </td>
+                    <td style={{ padding: '0.5rem', fontStyle: 'italic' }}>{log.details}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p style={{ fontStyle: 'italic', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+            {t('adminChangesLogEmpty', lang)}
           </p>
         )}
       </div>
@@ -374,6 +470,65 @@ export default function AdminDashboard({
           </div>
         </div>
 
+        {/* AI Uzlaşı Potansiyeli Keşif Paneli */}
+        <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <h2 style={{ fontSize: '1.25rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Sparkles size={18} className="text-secondary" />
+            {lang === 'tr' ? 'Uzlaşı Potansiyeli Keşif Paneli' : 'Consensus Potential Discovery'}
+          </h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+            {lang === 'tr' 
+              ? 'Farklı fikir grupları arasındaki ortak kaygıları, birleştirici temaları ve uzlaşı potansiyellerini yapay zeka yardımıyla analiz edin.' 
+              : 'Analyze common concerns, unifying themes, and consensus potentials between different opinion groups using AI.'}
+          </p>
+          
+          {consensusResult && (
+            <div style={{ 
+              background: 'rgba(29, 78, 216, 0.05)', 
+              border: '1px solid var(--border-light)', 
+              padding: '1rem', 
+              borderRadius: 'var(--radius-md)', 
+              fontSize: '0.9rem',
+              lineHeight: '1.5'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#3b82f6', fontWeight: 'bold', fontSize: '0.8rem', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
+                <Sparkles size={14} />
+                <span>AI Tahmini</span>
+              </div>
+              <p style={{ color: 'var(--text-main)', margin: 0 }}>{consensusResult}</p>
+            </div>
+          )}
+          
+          {consensusError && (
+            <div style={{ 
+              background: 'rgba(239, 68, 68, 0.1)', 
+              border: '1px solid rgba(239, 68, 68, 0.2)', 
+              padding: '0.75rem', 
+              borderRadius: 'var(--radius-md)', 
+              color: '#f87171', 
+              fontSize: '0.85rem' 
+            }}>
+              {consensusError}
+            </div>
+          )}
+          
+          <button 
+            onClick={handleDiscoverConsensus} 
+            className="btn btn-secondary"
+            disabled={discoveringConsensus}
+            style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', borderColor: 'var(--color-secondary)', color: 'var(--color-secondary)' }}
+          >
+            {discoveringConsensus ? (
+              <span>{lang === 'tr' ? 'Analiz ediliyor...' : 'Analyzing...'}</span>
+            ) : (
+              <>
+                <Sparkles size={16} />
+                <span>{lang === 'tr' ? 'Uzlaşı Potansiyellerini Keşfet' : 'Discover Consensus Potentials'}</span>
+              </>
+            )}
+          </button>
+        </div>
+
         {/* Müzakere Sorusu Ayarı */}
         <div className="glass-panel">
           <h2 style={{ fontSize: '1.25rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -416,9 +571,9 @@ export default function AdminDashboard({
             </label>
             <select
               className="form-input"
-              value={targetK}
+               value={targetK}
               onChange={(e) => onUpdateCampsCount(parseInt(e.target.value, 10))}
-              style={{ background: '#110c22', color: '#fff', fontSize: '0.85rem', padding: '0.5rem' }}
+              style={{ background: 'var(--bg-card)', color: 'var(--text-main)', fontSize: '0.85rem', padding: '0.5rem' }}
             >
               <option value="2">2 {lang === 'tr' ? 'Fikir Grubu' : 'Opinion Clusters'}</option>
               <option value="3">3 {lang === 'tr' ? 'Fikir Grubu (Varsayılan)' : 'Opinion Clusters (Default)'}</option>

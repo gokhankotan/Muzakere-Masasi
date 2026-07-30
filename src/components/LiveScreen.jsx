@@ -19,6 +19,21 @@ export default function LiveScreen({ question, analysis, stats, status = 'active
   const totalVariance = varianceExplained.reduce((s, v) => s + v, 0);
   const showVarianceWarning = !isInsufficient && varianceExplained.length > 0 && totalVariance < 0.40;
 
+  const getConsensusGroupsText = (bridge) => {
+    if (!bridge.campApprovalRates || !camps || camps.length === 0) return '';
+    const approvedCamps = camps
+      .map((camp, idx) => {
+        const rate = bridge.campApprovalRates[idx];
+        const customName = analysis?.customCampNames?.[camp.id];
+        const campName = customName || camp.name;
+        return { name: campName, rate: rate };
+      })
+      .filter(item => item.rate >= 60);
+
+    if (approvedCamps.length === 0) return '';
+    return approvedCamps.map(item => `${item.name} (%${item.rate})`).join(', ');
+  };
+
   return (
     <div className="live-layout">
       {/* Sol Sütun: Canlı Görselleştirme Haritası ve Kamp Detayları */}
@@ -131,35 +146,53 @@ export default function LiveScreen({ question, analysis, stats, status = 'active
                   />
                 ))}
 
+                {/* Grid Çizgileri */}
+                <line x1="100" y1="0" x2="100" y2="400" stroke="var(--border-light)" strokeWidth="0.5" strokeDasharray="3,3" opacity="0.4" />
+                <line x1="300" y1="0" x2="300" y2="400" stroke="var(--border-light)" strokeWidth="0.5" strokeDasharray="3,3" opacity="0.4" />
+                <line x1="0" y1="100" x2="400" y2="100" stroke="var(--border-light)" strokeWidth="0.5" strokeDasharray="3,3" opacity="0.4" />
+                <line x1="0" y1="300" x2="400" y2="300" stroke="var(--border-light)" strokeWidth="0.5" strokeDasharray="3,3" opacity="0.4" />
+
+                {/* Grid Koordinat İşaretleri */}
+                <text x="100" y="392" fill="var(--text-muted)" fontSize="7" opacity="0.6" textAnchor="middle">-50</text>
+                <text x="300" y="392" fill="var(--text-muted)" fontSize="7" opacity="0.6" textAnchor="middle">+50</text>
+                <text x="5" y="105" fill="var(--text-muted)" fontSize="7" opacity="0.6" textAnchor="start">+50</text>
+                <text x="5" y="305" fill="var(--text-muted)" fontSize="7" opacity="0.6" textAnchor="start">-50</text>
+
                 {/* Eksenler */}
                 <line x1="200" y1="0" x2="200" y2="400" className="chart-axis" />
                 <line x1="0" y1="200" x2="400" y2="200" className="chart-axis" />
 
                 {/* Eksen Etiketleri */}
                 {analysis?.axisLabels && (
-                  <g style={{ opacity: 0.9 }}>
+                  <g style={{ opacity: 0.95 }}>
                     {/* X Eksen Etiketi (Sağ uçta) */}
-                    <text
-                      x="390"
-                      y="190"
-                      fill="var(--text-main)"
-                      fontSize="9"
-                      fontWeight="700"
-                      textAnchor="end"
-                    >
-                      {analysis.axisLabels.x} →
-                    </text>
+                    <g>
+                      <rect x="290" y="181" width="105" height="15" rx="3" fill="var(--color-primary)" />
+                      <text
+                        x="342.5"
+                        y="191"
+                        fill="#ffffff"
+                        fontSize="8.5"
+                        fontWeight="700"
+                        textAnchor="middle"
+                      >
+                        {analysis.axisLabels.x}
+                      </text>
+                    </g>
                     {/* Y Eksen Etiketi (Üst uçta) */}
-                    <text
-                      x="215"
-                      y="18"
-                      fill="var(--text-main)"
-                      fontSize="9"
-                      fontWeight="700"
-                      textAnchor="start"
-                    >
-                      {analysis.axisLabels.y} ↑
-                    </text>
+                    <g>
+                      <rect x="150" y="5" width="100" height="15" rx="3" fill="var(--color-primary)" />
+                      <text
+                        x="200"
+                        y="15"
+                        fill="#ffffff"
+                        fontSize="8.5"
+                        fontWeight="700"
+                        textAnchor="middle"
+                      >
+                        {analysis.axisLabels.y}
+                      </text>
+                    </g>
                   </g>
                 )}
 
@@ -358,9 +391,17 @@ export default function LiveScreen({ question, analysis, stats, status = 'active
                   <div style={{ fontSize: '1.05rem', fontWeight: 500, lineHeight: 1.4 }}>
                     "{bridge.text}"
                   </div>
-                  <div className="bridge-meta">
-                    <span className="bridge-tag">{lang === 'tr' ? 'Ortak Mutabakat' : 'Common Consensus'}</span>
-                    <span>{lang === 'tr' ? 'Ortalama Onay' : 'Average Approval'}: %{bridge.overallRate}</span>
+                  <div className="bridge-meta" style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'flex-start' }}>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <span className="bridge-tag">{lang === 'tr' ? 'Ortak Mutabakat' : 'Common Consensus'}</span>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{lang === 'tr' ? 'Ortalama Onay' : 'Average Approval'}: %{bridge.overallRate}</span>
+                    </div>
+                    {getConsensusGroupsText(bridge) && (
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                        <strong>{lang === 'tr' ? 'Mutabık Gruplar: ' : 'Consensus Groups: '}</strong>
+                        <span style={{ color: 'var(--color-agree)', fontWeight: 600 }}>{getConsensusGroupsText(bridge)}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}

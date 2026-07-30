@@ -15,7 +15,7 @@ import bcrypt from 'bcrypt';
 import { db } from './database.js';
 import { calculatePCA, runKMeansWithStability, analyzeCampsAndBridges, alignCentroids, calculatePolarisability, calculateKMeans } from './algorithms.js';
 import { authenticateAdmin, passwordRateLimiter, checkParticipantAccess, checkModerator, verifySessionToken, requireSessionOwnership, isSessionOwner } from './middleware/auth.middleware.js';
-import { generateClusterSummary, evaluateOpinionContent, generateAxisLabel } from './services/llm.service.js';
+import { generateClusterSummary, evaluateOpinionContent, generateAxisLabel, generatePolarizationImpactDescription, discoverConsensusPotential } from './services/llm.service.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -119,7 +119,17 @@ app.get('/api/admin/sessions-overview', authenticateAdmin, async (req, res) => {
         }));
     }
 
-    res.json({ success: true, sessions: overview });
+    res.json({ success: true, overview });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// 1.2.5 Admin Değişiklik Günlüğü Endpoint'i
+app.get('/api/admin/action-log', authenticateAdmin, (req, res) => {
+  try {
+    const logs = db.getAdminActions();
+    res.json({ success: true, logs });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -453,17 +463,106 @@ app.get('/api/sessions/:code/report', checkParticipantAccess, async (req, res) =
       return res.status(404).json({ success: false, message: 'Oturum bulunamadı.' });
     }
 
+    const activeParticipants = session.participants.filter(p => !p.isBanned);
+    const statements = session.statements;
+    const n = activeParticipants.length;
+    const m = statements.length;
+
+    let polarizationImpacts = [];
+    if (n >= 10 && m >= 5) {
+      // 1. Calculate actual polarization score
+      const X_full = activeParticipants.map(p => statements.map(st => p.votes[st.id] !== undefined ? p.votes[st.id] : null));
+      const pcaFull = calculatePCA(X_full, 2);
+      const scoresFull = pcaFull.scores;
+      let minX = Infinity, maxX = -Infinity;
+      let minY = Infinity, maxY = -Infinity;
+      scoresFull.forEach(pt => {
+        if (pt[0] < minX) minX = pt[0];
+        if (pt[0] > maxX) maxX = pt[0];
+        if (pt[1] < minY) minY = pt[1];
+        if (pt[1] > maxY) maxY = pt[1];
+      });
+      const rangeX = maxX - minX;
+      const rangeY = maxY - minY;
+      const coordsFull = activeParticipants.map((p, i) => {
+        let xCoord = 0;
+        let yCoord = 0;
+        if (rangeX > 1e-5) xCoord = ((scoresFull[i][0] - minX) / rangeX) * 160 - 80;
+        if (rangeY > 1e-5) yCoord = ((scoresFull[i][1] - minY) / rangeY) * 160 - 80;
+        return [xCoord, yCoord];
+      });
+      const k = Math.min(session.targetK || 3, n);
+      const kmFull = runKMeansWithStability(coordsFull, k, 5);
+      const pointsFull = coordsFull.map((c, i) => ({ x: c[0], y: c[1], campId: kmFull.assignments[i] }));
+      const campsFull = Array(k).fill(0).map((_, cIdx) => {
+        const size = pointsFull.filter(pt => pt.campId === cIdx).length;
+        const c = kmFull.centroids[cIdx] || [0, 0];
+        return { id: cIdx, size, x: c[0], y: c[1] };
+      });
+      const polFull = calculatePolarisability(pointsFull, campsFull);
+      const actualPolarisability = polFull.polarisability || 0;
+
+      // 2. Run leave-one-out sensitivity analysis
+      const impacts = await Promise.all(statements.map(async (targetOpinion) => {
+        const filteredStatements = statements.filter(st => st.id !== targetOpinion.id);
+        const X_filtered = activeParticipants.map(p => filteredStatements.map(st => p.votes[st.id] !== undefined ? p.votes[st.id] : null));
+        const pcaFiltered = calculatePCA(X_filtered, 2);
+        const scoresFiltered = pcaFiltered.scores;
+        let minX_f = Infinity, maxX_f = -Infinity;
+        let minY_f = Infinity, maxY_f = -Infinity;
+        scoresFiltered.forEach(pt => {
+          if (pt[0] < minX_f) minX_f = pt[0];
+          if (pt[0] > maxX_f) maxX_f = pt[0];
+          if (pt[1] < minY_f) minY_f = pt[1];
+          if (pt[1] > maxY_f) maxY_f = pt[1];
+        });
+        const rangeX_f = maxX_f - minX_f;
+        const rangeY_f = maxY_f - minY_f;
+        const coordsFiltered = activeParticipants.map((p, i) => {
+          let xCoord = 0;
+          let yCoord = 0;
+          if (rangeX_f > 1e-5) xCoord = ((scoresFiltered[i][0] - minX_f) / rangeX_f) * 160 - 80;
+          if (rangeY_f > 1e-5) yCoord = ((scoresFiltered[i][1] - minY_f) / rangeY_f) * 160 - 80;
+          return [xCoord, yCoord];
+        });
+        
+        const kmFiltered = runKMeansWithStability(coordsFiltered, k, 5);
+        const pointsFiltered = coordsFiltered.map((c, i) => ({ x: c[0], y: c[1], campId: kmFiltered.assignments[i] }));
+        const campsFiltered = Array(k).fill(0).map((_, cIdx) => {
+          const size = pointsFiltered.filter(pt => pt.campId === cIdx).length;
+          const c = kmFiltered.centroids[cIdx] || [0, 0];
+          return { id: cIdx, size, x: c[0], y: c[1] };
+        });
+        const polFiltered = calculatePolarisability(pointsFiltered, campsFiltered);
+        const polarisabilityWithoutOpinion = polFiltered.polarisability || 0;
+        
+        const impact = actualPolarisability - polarisabilityWithoutOpinion;
+        
+        const description = await generatePolarizationImpactDescription(impact);
+        
+        return {
+          opinionContent: targetOpinion.text,
+          polarizationImpact: parseFloat(impact.toFixed(1)),
+          description
+        };
+      }));
+
+      // Sort by polarizationImpact descending, take top 5
+      polarizationImpacts = impacts.sort((a, b) => b.polarizationImpact - a.polarizationImpact).slice(0, 5);
+    }
+
     res.json({
       code: session.code,
       title: session.title,
       description: session.description,
       question: session.question,
       createdAt: session.createdAt,
-      participantsCount: session.participants.filter(p => !p.isBanned).length,
+      participantsCount: activeParticipants.length,
       statementsCount: session.statements.length,
       statements: session.statements,
       analysis: session.analysis,
-      participants: session.participants.filter(p => !p.isBanned).map(p => ({
+      polarizationImpacts,
+      participants: activeParticipants.map(p => ({
         nickname: p.nickname,
         justification: p.justification,
         votesCount: Object.keys(p.votes).length,
@@ -472,6 +571,30 @@ app.get('/api/sessions/:code/report', checkParticipantAccess, async (req, res) =
     });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// 8.0b. Uzlaşı Potansiyeli Keşfi (REST API)
+app.post('/api/sessions/:code/discover-consensus', requireSessionOwnership, async (req, res) => {
+  const { code } = req.params;
+  const upperCode = code.toUpperCase();
+
+  try {
+    const session = await db.getSessionByCode(upperCode);
+    if (!session) {
+      return res.status(404).json({ success: false, message: 'Oturum bulunamadı.' });
+    }
+
+    const analysis = session.analysis;
+    if (!analysis || analysis.insufficientData || !analysis.camps || analysis.camps.length === 0) {
+      return res.status(400).json({ success: false, message: 'Yeterli veri veya analiz bulunmadığından uzlaşı analizi yapılamaz.' });
+    }
+
+    // Call LLM
+    const consensusPotential = await discoverConsensusPotential(analysis.camps, session.question);
+    res.json({ success: true, consensusPotential });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Şu an uzlaşı potansiyeli analiz edilemedi.' });
   }
 });
 
@@ -608,10 +731,25 @@ async function performAnalysis(sessionCode) {
   const top3X = getTop3LoadingStatements(0);
   const top3Y = getTop3LoadingStatements(1);
 
-  const [axisLabelX, axisLabelY] = await Promise.all([
-    generateAxisLabel('x', top3X),
-    generateAxisLabel('y', top3Y)
-  ]);
+  const signatureX = top3X.map(item => item.statement?.id).filter(Boolean).sort().join('-');
+  const signatureY = top3Y.map(item => item.statement?.id).filter(Boolean).sort().join('-');
+
+  let axisLabelX = '';
+  let axisLabelY = '';
+
+  const prevAxisLabels = session.analysis?.axisLabels || {};
+  if (process.env.DISABLE_LLM_CACHE !== 'true' && prevAxisLabels.signatureX === signatureX && prevAxisLabels.x) {
+    axisLabelX = prevAxisLabels.x;
+  } else {
+    axisLabelX = await generateAxisLabel('x', top3X);
+  }
+
+  if (process.env.DISABLE_LLM_CACHE !== 'true' && prevAxisLabels.signatureY === signatureY && prevAxisLabels.y) {
+    axisLabelY = prevAxisLabels.y;
+  } else {
+    axisLabelY = await generateAxisLabel('y', top3Y);
+  }
+
 
   // Koordinatları görselleştirme için normalize et (-80 ile 80 arasına çek)
   let minX = Infinity, maxX = -Infinity;
@@ -686,13 +824,21 @@ async function performAnalysis(sessionCode) {
     }
 
     const topStatements = (campCharacteristics[cIdx] || []).map(c => ({
+      id: c.statement.id,
       text: c.statement.text,
       approvalRate: Math.round(c.approvalRate * 100),
       contrastScore: parseFloat(c.contrastScore.toFixed(2))
     }));
 
-    // LLM ile Türkçe grup özeti al
-    const summary = await generateClusterSummary(cIdx, topStatements);
+    const signature = (campCharacteristics[cIdx] || []).map(c => c.statement.id).filter(Boolean).sort().join('-');
+
+    let summary = '';
+    const prevCamp = session.analysis?.camps?.find(c => c.id === cIdx);
+    if (process.env.DISABLE_LLM_CACHE !== 'true' && prevCamp && prevCamp.signature === signature && prevCamp.summary) {
+      summary = prevCamp.summary;
+    } else {
+      summary = await generateClusterSummary(cIdx, topStatements);
+    }
 
     return {
       id: cIdx,
@@ -701,7 +847,8 @@ async function performAnalysis(sessionCode) {
       x: parseFloat(centroid[0].toFixed(2)),
       y: parseFloat(centroid[1].toFixed(2)),
       topStatements,
-      summary
+      summary,
+      signature
     };
   }));
 
@@ -820,7 +967,7 @@ async function performAnalysis(sessionCode) {
     })),
     polarisability,
     insufficientVariance,
-    axisLabels: { x: axisLabelX, y: axisLabelY },
+    axisLabels: { x: axisLabelX, y: axisLabelY, signatureX, signatureY },
     subClusters: finalSubClusters,
     participationGini,
     voteCompletionRate,

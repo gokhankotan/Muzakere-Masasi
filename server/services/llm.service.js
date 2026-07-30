@@ -1,9 +1,26 @@
 import OpenAI from 'openai';
+import fs from 'fs';
+import path from 'path';
+
+function logDryRunCall(type) {
+  try {
+    const logDir = path.join(process.cwd(), 'logs');
+    if (!fs.existsSync(logDir)) {
+      fs.mkdirSync(logDir, { recursive: true });
+    }
+    const logFile = path.join(logDir, 'llm-dry-run.jsonl');
+    const entry = JSON.stringify({ type, timestamp: new Date().toISOString() }) + '\n';
+    fs.appendFileSync(logFile, entry, 'utf8');
+  } catch (err) {
+    console.error('Failed to write dry-run log:', err.message);
+  }
+}
+
 
 // Ortam değişkenlerinden yapılandırmayı oku
-const apiKey = process.env.LLM_API_KEY;
-const baseURL = process.env.LLM_BASE_URL;
-const modelName = process.env.LLM_MODEL_NAME || 'gpt-3.5-turbo';
+const apiKey = process.env.LLM_API_KEY ? process.env.LLM_API_KEY.replace(/['"]/g, '').trim() : undefined;
+const baseURL = process.env.LLM_BASE_URL ? process.env.LLM_BASE_URL.replace(/['"]/g, '').trim() : undefined;
+const modelName = process.env.LLM_MODEL_NAME ? process.env.LLM_MODEL_NAME.replace(/['"]/g, '').trim() : 'gpt-3.5-turbo';
 
 let openaiClient = null;
 
@@ -51,6 +68,11 @@ function generateFallbackSummary(campId, topStatements) {
  * @returns {Promise<string>} 1-2 cümlelik Türkçe küme özeti
  */
 export async function generateClusterSummary(campId, topStatements) {
+  if (process.env.LLM_DRY_RUN === 'true') {
+    logDryRunCall('cluster-summary');
+    return `[DRY-RUN] Küme Özeti (Grup ${campId})`;
+  }
+
   // Eğer OpenAI istemcisi yoksa veya hiç görüş yoksa doğrudan fallback çalıştır
   if (!openaiClient || !topStatements || topStatements.length === 0) {
     return generateFallbackSummary(campId, topStatements);
@@ -136,6 +158,11 @@ function evaluateOpinionFallback(text) {
  * @returns {Promise<{flagged: boolean, reason: string|null}>}
  */
 export async function evaluateOpinionContent(text, question) {
+  if (process.env.LLM_DRY_RUN === 'true') {
+    logDryRunCall('moderation');
+    return { flagged: false, reason: null };
+  }
+
   if (!text || text.trim().length === 0) {
     return { flagged: true, reason: 'Görüş metni boş olamaz.' };
   }
@@ -205,6 +232,11 @@ Eğer görüş tamamen uygunsa:
  * @returns {Promise<string>} Kısa Türkçe etiket metni
  */
 export async function generateAxisLabel(axisName, topStatements) {
+  if (process.env.LLM_DRY_RUN === 'true') {
+    logDryRunCall('axis-label');
+    return `[DRY-RUN] Eksen ${axisName.toUpperCase()} Etiketi`;
+  }
+
   // Eğer OpenAI istemcisi yoksa veya hiç görüş yoksa doğrudan fallback çalıştır
   if (!openaiClient || !topStatements || topStatements.length === 0) {
     return generateAxisFallbackSummary(axisName, topStatements);
@@ -258,5 +290,111 @@ function generateAxisFallbackSummary(axisName, topStatements) {
   }
   return `${axisName.toUpperCase()} Ekseni: "${firstText}" Odaklılık`;
 }
+
+/**
+ * Bir görüş çıkarıldığında kutuplaşma derecesindeki değişimi Türkçe cümle olarak açıklar.
+ * @param {number} impact - Kutuplaşmaya olan sayısal etki (fark)
+ * @returns {Promise<string>}
+ */
+export async function generatePolarizationImpactDescription(impact) {
+  if (process.env.LLM_DRY_RUN === 'true') {
+    logDryRunCall('polarization-impact');
+    return `[DRY-RUN] Kutuplaşma Etkisi: %${impact.toFixed(1)}`;
+  }
+
+  const direction = impact >= 0 ? 'azalıyor' : 'artıyor';
+  const absImpact = Math.abs(impact).toFixed(1);
+  const fallbackSentence = `Bu görüş çıkarıldığında kutuplaşma derecesi %${absImpact} ${direction}.`;
+
+  if (!openaiClient) {
+    return fallbackSentence;
+  }
+
+  try {
+    const prompt = `Aşağıdaki analiz verisini nötr bir Türkçe cümle olarak ifade et.
+Görüş çıkarıldığında kutuplaşma derecesinin yüzde kaç değiştiğini belirt.
+Veri: Kutuplaşma derecesi %${absImpact} oranında ${direction}.
+Kurallar:
+- Asla ek bir yorum veya açıklama ekleme.
+- Cümle tam olarak şu şablona sahip olmalıdır: "Bu görüş çıkarıldığında kutuplaşma derecesi %${absImpact} ${direction}."
+- Başka hiçbir metin veya açıklama ekleme.`;
+
+    const response = await openaiClient.chat.completions.create({
+      model: modelName,
+      messages: [
+        { role: 'system', content: 'Sen sadece belirtilen formatta net Türkçe cümle üreten bir asistansın.' },
+        { role: 'user', content: prompt }
+      ],
+      max_tokens: 50,
+      temperature: 0.1,
+    });
+
+    const result = response.choices[0]?.message?.content?.trim();
+    if (result) {
+      return result;
+    }
+    return fallbackSentence;
+  } catch (err) {
+    console.warn('AI polarization impact description generation failed, using fallback:', err.message);
+    return fallbackSentence;
+  }
+}
+
+/**
+ * Fikir gruplarının en çok desteklediği görüşleri ve özetlerini analiz ederek ortak uzlaşı temalarını keşfeder.
+ * @param {Array} camps - Fikir grupları verisi
+ * @param {string} question - Müzakere ana sorusu
+ * @returns {Promise<string>}
+ */
+export async function discoverConsensusPotential(camps, question) {
+  if (process.env.LLM_DRY_RUN === 'true') {
+    logDryRunCall('consensus-discovery');
+    return `[DRY-RUN] Ortak Uzlaşı Potansiyeli Özeti`;
+  }
+
+  if (!openaiClient) {
+    throw new Error('LLM client not available');
+  }
+
+  try {
+    const campsDescription = camps.map((camp) => {
+      const mainOpinions = camp.topStatements.slice(0, 3).map((st) => `- "${st.text}" (Onay: %${st.approvalRate})`).join('\n');
+      return `### Grup: "${camp.name}" (Katılımcı: ${camp.size} kişi)\nGrup Tanımı: ${camp.summary || 'Belirtilmemiş'}\nÖne Çıkan Görüşleri:\n${mainOpinions}`;
+    }).join('\n\n');
+
+    const prompt = `Aşağıda, "${question}" konusu etrafında yürütülen bir müzakerede ortaya çıkan farklı fikir grupları (kamplar) ve bu grupların en çok desteklediği görüşler listelenmiştir:
+
+${campsDescription}
+
+Müzakere Konusu: "${question}"
+
+Görevin: Bu kamplar yüzeyde farklı çözümler önerse de, ortak bir endişe, kaygı veya tema etrafında birleşebilecekleri bir nokta (uzlaşı potansiyeli) var mı? Varsa, 2-3 cümleyle, son derece tarafsız, yapıcı ve doğrudan bir Türkçe ile açıkla.
+Kurallar:
+- Katılımcıların oy vermesi için yeni bir görüş (Opinion) Kesinlikle ÜRETME / YAZMA.
+- Sadece ortaklaşabilecekleri ana temayı, ortak kaygıyı veya birleştirici fikri tarif et.
+- Yanıtınız son derece profesyonel, yapıcı ve doğrudan olmalıdır. Başka hiçbir açıklama veya ekleme yapma.`;
+
+    const response = await openaiClient.chat.completions.create({
+      model: modelName,
+      messages: [
+        { role: 'system', content: 'Sen gruplar arası ortak uzlaşı alanlarını ve köprü temaları keşfeden profesyonel bir arabulucu asistansın.' },
+        { role: 'user', content: prompt }
+      ],
+      max_tokens: 250,
+      temperature: 0.5,
+    });
+
+    const result = response.choices[0]?.message?.content?.trim();
+    if (result) {
+      return result;
+    }
+    throw new Error('LLM boş yanıt döndürdü.');
+  } catch (err) {
+    console.error('LLM Uzlaşı Potansiyeli Keşif Hatası:', err.message);
+    throw err;
+  }
+}
+
+
 
 

@@ -37,6 +37,20 @@ export default function App() {
   const offlineVotesQueue = useRef([]);
   const [sessionsOverview, setSessionsOverview] = useState([]);
   const [lang, setLang] = useState(localStorage.getItem('muzakere_lang') || 'tr');
+  const [theme, setTheme] = useState(localStorage.getItem('muzakere_theme') || 'light');
+
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.body.classList.add('dark-theme');
+    } else {
+      document.body.classList.remove('dark-theme');
+    }
+    localStorage.setItem('muzakere_theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'light' ? 'dark' : 'light');
+  };
 
   useEffect(() => {
     if (role === 'admin' && isAdminAuthenticated) {
@@ -48,7 +62,7 @@ export default function App() {
         .then(res => res.json())
         .then(data => {
           if (data.success) {
-            setSessionsOverview(data.sessions);
+            setSessionsOverview(data.overview || data.sessions || []);
           }
         })
         .catch(err => console.error('Meta-analysis load error:', err));
@@ -578,11 +592,10 @@ export default function App() {
             </>
           )}
 
-          {role !== 'participant' && (
+          {(isAdminAuthenticated || role !== 'participant') && (
             <button 
               onClick={handleOpenAdminPanel} 
               className={`nav-btn ${role === 'admin' ? 'active' : ''}`}
-              style={{ borderColor: 'var(--color-primary)', color: 'var(--color-primary)' }}
             >
               <Shield size={16} /> {t('navAdminPanel', lang)}
             </button>
@@ -593,18 +606,44 @@ export default function App() {
             <button 
               onClick={() => handleToggleLang('tr')} 
               className={`nav-btn`} 
-              style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', background: lang === 'tr' ? 'var(--color-primary)' : 'transparent', borderColor: lang === 'tr' ? 'var(--color-primary)' : 'var(--border-light)', minWidth: 'auto' }}
+              style={{
+                padding: '0.25rem 0.5rem',
+                fontSize: '0.75rem',
+                border: lang === 'tr' ? '2px solid #ffffff' : '1px solid rgba(255,255,255,0.2)',
+                background: lang === 'tr' ? 'rgba(255,255,255,0.2)' : 'transparent',
+                color: '#ffffff',
+                minWidth: 'auto',
+                opacity: lang === 'tr' ? 1 : 0.6
+              }}
             >
               TR
             </button>
             <button 
               onClick={() => handleToggleLang('en')} 
               className={`nav-btn`} 
-              style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', background: lang === 'en' ? 'var(--color-primary)' : 'transparent', borderColor: lang === 'en' ? 'var(--color-primary)' : 'var(--border-light)', minWidth: 'auto' }}
+              style={{
+                padding: '0.25rem 0.5rem',
+                fontSize: '0.75rem',
+                border: lang === 'en' ? '2px solid #ffffff' : '1px solid rgba(255,255,255,0.2)',
+                background: lang === 'en' ? 'rgba(255,255,255,0.2)' : 'transparent',
+                color: '#ffffff',
+                minWidth: 'auto',
+                opacity: lang === 'en' ? 1 : 0.6
+              }}
             >
               EN
             </button>
           </div>
+
+          {/* Tema Seçici */}
+          <button
+            onClick={toggleTheme}
+            className="nav-btn"
+            style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', marginLeft: '0.5rem', minWidth: 'auto', background: 'transparent', borderColor: 'rgba(255,255,255,0.2)', color: '#ffffff' }}
+            title={lang === 'tr' ? 'Temayı Değiştir' : 'Toggle Theme'}
+          >
+            {theme === 'light' ? '🌙 Koyu' : '☀️ Açık'}
+          </button>
         </nav>
       </header>
 
