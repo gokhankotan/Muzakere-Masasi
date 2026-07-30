@@ -456,6 +456,7 @@ export async function generateExecutiveSummary(data) {
     participantsCount,
     statementsCount,
     campsCount,
+    camps = [],
     polarisability,
     bridgesCount,
     bridgesText = [],
@@ -463,11 +464,21 @@ export async function generateExecutiveSummary(data) {
     voteCompletionRate
   } = data;
 
-  const ruleBasedSummary = `Bu raporda, "${question}" konusu üzerine gerçekleştirilen müzakere oturumunda ${participantsCount} katılımcının katılımı ve ${statementsCount} onaylı görüş incelenmiştir. Oturum sonucunda katılımcılar ${campsCount} ana fikir grubuna ayrışmış olup, kutuplaşma derecesi %${polarisability !== null && polarisability !== undefined ? polarisability : '—'} olarak hesaplanmıştır. Oturumda toplam ${bridgesCount} adet uzlaşı/köprü görüş tespit edilmiştir. Katılım eşitliği (Gini katsayısı) ${participationGini !== undefined ? participationGini : '—'} ve oy tamamlama oranı %${voteCompletionRate !== undefined ? voteCompletionRate : '—'} düzeyindedir.`;
+  const campsListText = camps.length > 0
+    ? camps.map((c, i) => `Grup ${String.fromCharCode(65 + i)} (${c.name || 'Grup ' + (i+1)}): ${c.size || 0} katılımcı${c.summary ? ' - ' + c.summary : ''}`).join('\n')
+    : 'Fikir grupları netleşmemiştir.';
+
+  const ruleBasedSummary = `Bu rapor, "${question}" konusu etrafında yürütülen kamusal müzakere oturumunun algoritmik ve istatistiksel bulgularını sunmaktadır. Oturuma toplam ${participantsCount} katılım sağlanmış ve moderasyon sürecinden geçen ${statementsCount} onaylı görüş katılımcıların oylamasına sunulmuştur. Katılımcıların oy tamamlama oranı %${voteCompletionRate !== undefined && voteCompletionRate !== null ? voteCompletionRate : '—'} seviyesinde gerçekleşirken, görüş üretmedeki katılım eşitliği (Gini katsayısı) ${participationGini !== undefined && participationGini !== null ? participationGini : '—'} olarak ölçülmüştür.
+
+Veri analizi sonucunda katılımcıların oy örüntüleri ${campsCount} ana fikir grubunda (kümede) yoğunlaşmıştır. Oturum genelindeki kutuplaşma ve fikir ayrışması derecesi %${polarisability !== null && polarisability !== undefined ? polarisability : '—'} olarak hesaplanmıştır. ${camps.length > 0 ? `Ortaya çıkan fikir grupları şunlardır: ${camps.map(c => c.name).join(', ')}.` : ''}
+
+${bridgesCount > 0 
+  ? `Farklı fikir grupları arasında ortak payda oluşturan ${bridgesCount} adet uzlaşı (köprü) görüş tespit edilmiştir. En yüksek mutabakata sahip köprü fikirler şunlardır: ${bridgesText.map(t => `"${t}"`).join('; ')}.`
+  : 'Müzakere sürecinde tüm fikir gruplarının üzerinde uzlaştığı ortak bir köprü görüş henüz tespit edilememiştir.'}`;
 
   if (process.env.LLM_DRY_RUN === 'true') {
     logDryRunCall('executive-summary');
-    return `[DRY-RUN] ${ruleBasedSummary}`;
+    return `[DRY-RUN]\n${ruleBasedSummary}`;
   }
 
   if (!openaiClient) {
@@ -477,37 +488,43 @@ export async function generateExecutiveSummary(data) {
   try {
     const bridgesList = bridgesText.length > 0
       ? bridgesText.map((txt, i) => `${i + 1}. "${txt}"`).join('\n')
-      : 'Ulaşılan ortak uzlaşı görüşü bulunmamaktadır.';
+      : 'Tüm gruplarca ortak onaylanan köprü görüş bulunmamaktadır.';
 
     const prompt = `
-Aşağıdaki verilere dayanarak bir müzakere oturumunun 3-5 cümlelik, tarafsız, profesyonel, akademik ve nötr bir Türkçe "Yönetici Özeti" metnini yaz.
+Aşağıdaki müzakere verilerini inceleyerek yöneticiler ve karar vericiler için son derece net, detaylı, akıcı, profesyonel ve 3 paragraftan oluşan bir Türkçe "Yönetici Özeti" (Executive Summary) yaz.
 
-Müzakere Konusu: "${question}"
-Katılımcı Sayısı: ${participantsCount}
-Onaylı Görüş Sayısı: ${statementsCount}
-Fikir Grubu (Kamp) Sayısı: ${campsCount}
+--- MÜZAKERE VERİLERİ ---
+Müzakere Konusu / Soru: "${question}"
+Toplam Katılımcı Sayısı: ${participantsCount}
+Onaylanan Görüş Sayısı: ${statementsCount}
+Oy Tamamlama Oranı: %${voteCompletionRate !== undefined && voteCompletionRate !== null ? voteCompletionRate : 'Hesaplanamadı'}
+Katılım Eşitliği (Gini Katsayısı): ${participationGini !== undefined && participationGini !== null ? participationGini : 'Hesaplanamadı'} (0=Tam Eşitlik, 1=Yüksek Eşitsizlik)
+
+Fikir Grubu (Küme) Sayısı: ${campsCount}
 Kutuplaşma Derecesi: %${polarisability !== null && polarisability !== undefined ? polarisability : 'Hesaplanamadı'}
-Köprü (Uzlaşı) Cümle Sayısı: ${bridgesCount}
-Köprü Görüşler:
-${bridgesList}
-Katılım Eşitliği (Gini Katsayısı): ${participationGini !== undefined ? participationGini : 'Hesaplanamadı'} (Not: Değer 0'a yakınsa dengeli katılımı, 1'e yakınsa az sayıda kişinin baskınlığını gösterir)
-Oy Tamamlama Oranı: %${voteCompletionRate !== undefined ? voteCompletionRate : 'Hesaplanamadı'}
+Fikir Grupları Detayı:
+${campsListText}
 
-Kurallar:
-- Sadece yukarıda verilen sayısal bulguları ve verileri kullanarak bir özet oluştur.
-- KESİNLİKLE yeni bir yorum, öneri, değer yargısı veya veri dışı çıkarım ekleme.
-- Katılımcı isimlerini veya rumuzlarını KESİNLİKLE bu özette geçirme.
-- Metin 3-5 cümleden oluşmalıdır. Akıcı, tarafsız ve düzyazı formatında olmalıdır.
-- Çıktı sadece özet metinden oluşmalıdır. "Thinking Process" veya düşünme adımları KESİNLİKLE çıktıya DAHİL EDİLMEMELİDİR.
+Köprü (Uzlaşı) Görüş Sayısı: ${bridgesCount}
+Köprü Görüşler Metni:
+${bridgesList}
+
+--- KURALLAR VE FORMAT ---
+1. Özeti tam olarak 3 net paragraf halinde düzenle:
+   - Paragraf 1: Oturumun genel kapsamı, katılım oranları, görüş sayısı ve katılım dengesi (Gini katsayısı ve oy tamamlama).
+   - Paragraf 2: Fikir gruplarının yapısı, kutuplaşma indeksi ve grupların temel eğilimlerinin özet değerlendirmesi.
+   - Paragraf 3: Ortak uzlaşı (köprü) görüşler, gruplar arasındaki ortak paydalar veya uzlaşı eksikliğinin değerlendirmesi.
+2. Çıktı doğrudan Yönetici Özeti metni olmalıdır. "1. Paragraf:", "Thinking Process" gibi başlıklar KESİNLİKLE koyma.
+3. Dili akademik, profesyonel, tarafsız ve kolay anlaşılır olsun.
 `;
 
     const response = await openaiClient.chat.completions.create({
       model: modelName,
       messages: [
-        { role: 'system', content: 'Sen sadece verilen sayısal ve istatistiksel verileri nötr bir Türkçe metne dönüştüren ve asla düşünme adımlarını/düşünme sürecini çıktıya dahil etmeyen bir analiz asistanısın.' },
+        { role: 'system', content: 'Sen müzakere ve veri analiz verilerini yöneticiler için akıcı, detaylı ve 3 paragraflı Türkçe özet raporlara dönüştüren profesyonel bir analiz uzmanısın.' },
         { role: 'user', content: prompt }
       ],
-      max_tokens: 800,
+      max_tokens: 1000,
       temperature: 0.3,
     });
 
@@ -515,7 +532,7 @@ Kurallar:
     if (summary) {
       // Düşünme etiketlerini ve Thinking Process kısımlarını temizle
       summary = summary.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-      summary = summary.replace(/^Thinking Process:[\s\S]*?(?=(Bu raporda|Oturumda|Müzakere))/i, '').trim();
+      summary = summary.replace(/^Thinking Process:[\s\S]*?(?=(Bu raporda|Oturumda|Müzakere|Bu çalışma|Bu analiz))/i, '').trim();
       
       // Eğer hala 'Thinking Process' içeriyorsa ve sonunda temiz bir paragraf varsa onu al
       if (summary.toLowerCase().includes('thinking process')) {

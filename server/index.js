@@ -556,6 +556,7 @@ app.get('/api/sessions/:code/report', checkParticipantAccess, async (req, res) =
       participantsCount: activeParticipants.length,
       statementsCount: session.statements.length,
       campsCount: session.analysis?.camps?.length || 0,
+      camps: session.analysis?.camps ? session.analysis.camps.map(c => ({ name: c.name, size: c.size, summary: c.summary })) : [],
       polarisability: session.analysis?.polarisability !== undefined ? session.analysis.polarisability : null,
       bridgesCount: session.analysis?.bridges?.length || 0,
       bridgesText: session.analysis?.bridges ? session.analysis.bridges.map(b => b.text) : [],

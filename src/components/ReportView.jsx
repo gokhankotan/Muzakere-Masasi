@@ -137,22 +137,29 @@ export default function ReportView({ onBack, sessionCode, lang = "tr" }) {
         {/* 1. Yönetici Özeti */}
         <section className="report-section">
           <h2 className="report-section-title"><span className="report-section-num">1.</span>{lang === "tr" ? "Yönetici Özeti" : "Executive Summary"}</h2>
-          <div className="report-abstract" style={{ whiteSpace: "pre-line" }}>
+          <div className="report-abstract" style={{ whiteSpace: "pre-line", lineHeight: "1.7" }}>
             {reportData.executiveSummary ? (
               <p>{reportData.executiveSummary}</p>
             ) : (
               <>
                 <p>
                   {lang === "tr"
-                    ? `Bu rapor, "${question}" konusunda gerçekleştirilen kamusal müzakere oturumunun bulgularını akademik bir çerçevede sunmaktadır. Oturuma ${participantsCount} katılımcı katılmış; toplam ${statementsCount} görüş moderasyon sürecinden geçerek değerlendirmeye alınmıştır.`
-                    : `This report presents findings of a public deliberation session on "${question}". ${participantsCount} participants joined; ${statementsCount} opinions were evaluated after moderation.`}
+                    ? `Bu rapor, "${question}" konusu etrafında gerçekleştirilen kamusal müzakere oturumunun bulgularını ve istatistiksel verilerini sunmaktadır. Oturuma toplam ${participantsCount} katılımcı dahil olmuş; moderasyon sürecinden geçen ${statementsCount} farklı görüş oylamaya sunulmuştur. Oy tamamlama oranı %${analysis?.voteCompletionRate ?? '—'} seviyesinde gerçekleşirken, görüş belirtmedeki katılım eşitliği (Gini Katsayısı) ${analysis?.participationGini ?? '—'} olarak ölçülmüştür.`
+                    : `This report presents the findings and statistical insights of the public deliberation session on "${question}". A total of ${participantsCount} participants took part, evaluating ${statementsCount} moderated statements. Vote completion rate reached ${analysis?.voteCompletionRate ?? '—'}%, with a participation equality (Gini Index) of ${analysis?.participationGini ?? '—'}.`}
                 </p>
                 {!analysis?.insufficientData && !analysis?.insufficientVariance && (
-                  <p style={{ marginTop: "0.75rem" }}>
-                    {lang === "tr"
-                      ? `PCA ve K-Ortalamalar kullanılarak katılımcı görüşleri ${analysis?.camps?.length || 0} farklı fikir grubuna ayrıştırılmıştır. Kutuplaşma indeksi %${analysis?.polarisability} olarak hesaplanmıştır. ${analysis?.bridges?.length > 0 ? `Gruplar arasında ${analysis.bridges.length} uzlaşı görüşü tespit edilmiştir.` : "Gruplar arasında ortak uzlaşı noktası bulunamamıştır."}`
-                      : `Using PCA and K-Means, opinions were separated into ${analysis?.camps?.length || 0} groups. Polarization index: ${analysis?.polarisability}%. ${analysis?.bridges?.length > 0 ? `${analysis.bridges.length} consensus opinion(s) found.` : "No consensus opinions found across groups."}`}
-                  </p>
+                  <>
+                    <p style={{ marginTop: "0.85rem" }}>
+                      {lang === "tr"
+                        ? `Temel Bileşenler Analizi (PCA) ve K-Ortalamalar (K-Means) algoritması kullanılarak katılımcı oyları ${analysis?.camps?.length || 0} ana fikir grubuna (kümesine) ayrıştırılmıştır. Oturum genelindeki kutuplaşma ve fikir ayrışması indeksi %${analysis?.polarisability ?? '—'} olarak hesaplanmıştır.`
+                        : `Using Principal Component Analysis (PCA) and K-Means clustering, participant votes were grouped into ${analysis?.camps?.length || 0} distinct opinion clusters. The overall polarization index was calculated as ${analysis?.polarisability ?? '—'}%.`}
+                    </p>
+                    <p style={{ marginTop: "0.85rem" }}>
+                      {lang === "tr"
+                        ? `${analysis?.bridges?.length > 0 ? `Analiz sonucunda farklı fikir grupları arasında köprü kuran ${analysis.bridges.length} adet uzlaşı görüşü tespit edilmiştir. En yüksek mutabakata sahip uzlaşı görüşü: "${analysis.bridges[0]?.text}"` : "Gruplar arasında tüm kesimlerince ortak kabul gören bir uzlaşı görüşü henüz tespit edilememiştir."}`
+                        : `${analysis?.bridges?.length > 0 ? `${analysis.bridges.length} consensus (bridge) statement(s) were identified across opinion clusters. Top consensus statement: "${analysis.bridges[0]?.text}"` : "No shared consensus statement was identified across all opinion clusters."}`}
+                    </p>
+                  </>
                 )}
               </>
             )}
