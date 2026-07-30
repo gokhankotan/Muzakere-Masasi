@@ -260,14 +260,14 @@ export default function ReportView({ onBack, sessionCode, lang = "tr" }) {
                             </div>
                           )}
                         </td>
-                        <td style={{ textAlign: "center", color: "#047857", fontWeight: "bold" }}>%{bridge.overallRate}</td>
+                        <td style={{ textAlign: "center", color: "var(--color-agree)", fontWeight: "bold" }}>%{bridge.overallRate}</td>
                         <td style={{ textAlign: "center" }}>%{bridge.minApproval}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               ) : (
-                <div style={{ padding: "1.5rem", border: "1px dashed #d1d5db", textAlign: "center", color: "#6b7280", borderRadius: "8px", fontStyle: "italic" }}>
+                <div style={{ padding: "1.5rem", border: "1px dashed var(--border-light)", textAlign: "center", color: "var(--text-muted)", borderRadius: "8px", fontStyle: "italic" }}>
                   {lang === "tr" ? "Bu oturumda tüm gruplarca paylasilan bir uzlasi görüsüne ulasilamamistir." : "No consensus opinion shared by all groups was reached in this session."}
                 </div>
               )}
@@ -342,7 +342,7 @@ export default function ReportView({ onBack, sessionCode, lang = "tr" }) {
                       <div key={idx} className="report-camp-card">
                         <div className="report-camp-title">
                           {lang === "tr" ? `Grup ${campLetter}` : `Cluster ${campLetter}`}
-                          <span style={{ fontWeight: 400, fontSize: "0.9rem", marginLeft: "0.75rem", color: "#6b7280" }}>— {camp.size} {lang === "tr" ? "katilimci" : "participants"} (%{pct})</span>
+                          <span style={{ fontWeight: 400, fontSize: "0.9rem", marginLeft: "0.75rem", color: "var(--text-muted)" }}>— {camp.size} {lang === "tr" ? "katilimci" : "participants"} (%{pct})</span>
                         </div>
                         {camp.topStatements && camp.topStatements.length > 0 ? (
                           <table className="report-table" style={{ marginTop: "0.5rem" }}>
@@ -356,20 +356,20 @@ export default function ReportView({ onBack, sessionCode, lang = "tr" }) {
                               {camp.topStatements.map((st, sIdx) => (
                                 <tr key={sIdx}>
                                   <td><em>"{st.text}"</em></td>
-                                  <td style={{ textAlign: "center", fontWeight: 600, color: "#047857" }}>%{st.approvalRate}</td>
+                                  <td style={{ textAlign: "center", fontWeight: 600, color: "var(--color-agree)" }}>%{st.approvalRate}</td>
                                 </tr>
                               ))}
                             </tbody>
                           </table>
                         ) : (
-                          <p style={{ color: "#9ca3af", fontStyle: "italic", fontSize: "0.85rem", marginTop: "0.5rem" }}>{lang === "tr" ? "Bu grup için yeterli görüs tespit edilemedi." : "No sufficient opinions detected for this group."}</p>
+                          <p style={{ color: "var(--text-muted)", fontStyle: "italic", fontSize: "0.85rem", marginTop: "0.5rem" }}>{lang === "tr" ? "Bu grup için yeterli görüs tespit edilemedi." : "No sufficient opinions detected for this group."}</p>
                         )}
                       </div>
                     );
                   })}
                 </div>
               ) : (
-                <p style={{ color: "#6b7280", fontStyle: "italic" }}>{lang === "tr" ? "Yeterli veri bulunmamaktadir." : "Insufficient data."}</p>
+                <p style={{ color: "var(--text-muted)", fontStyle: "italic" }}>{lang === "tr" ? "Yeterli veri bulunmamaktadir." : "Insufficient data."}</p>
               )}
             </section>
 
