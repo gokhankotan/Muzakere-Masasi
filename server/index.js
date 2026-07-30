@@ -753,13 +753,16 @@ async function performAnalysis(sessionCode) {
   let axisLabelY = '';
 
   const prevAxisLabels = session.analysis?.axisLabels || {};
-  if (process.env.DISABLE_LLM_CACHE !== 'true' && prevAxisLabels.signatureX === signatureX && prevAxisLabels.x) {
+  const isXClean = prevAxisLabels.x && !prevAxisLabels.x.includes('Thinking Process') && !prevAxisLabels.x.includes('<think>');
+  const isYClean = prevAxisLabels.y && !prevAxisLabels.y.includes('Thinking Process') && !prevAxisLabels.y.includes('<think>');
+
+  if (process.env.DISABLE_LLM_CACHE !== 'true' && prevAxisLabels.signatureX === signatureX && isXClean) {
     axisLabelX = prevAxisLabels.x;
   } else {
     axisLabelX = await generateAxisLabel('x', top3X);
   }
 
-  if (process.env.DISABLE_LLM_CACHE !== 'true' && prevAxisLabels.signatureY === signatureY && prevAxisLabels.y) {
+  if (process.env.DISABLE_LLM_CACHE !== 'true' && prevAxisLabels.signatureY === signatureY && isYClean) {
     axisLabelY = prevAxisLabels.y;
   } else {
     axisLabelY = await generateAxisLabel('y', top3Y);
@@ -849,7 +852,13 @@ async function performAnalysis(sessionCode) {
 
     let summary = '';
     const prevCamp = session.analysis?.camps?.find(c => c.id === cIdx);
-    if (process.env.DISABLE_LLM_CACHE !== 'true' && prevCamp && prevCamp.signature === signature && prevCamp.summary) {
+    const isSummaryClean = prevCamp?.summary && 
+      !prevCamp.summary.includes('Thinking Process') && 
+      !prevCamp.summary.includes('<think>') && 
+      !prevCamp.summary.toLowerCase().includes('concussion') && 
+      !prevCamp.summary.toLowerCase().includes('nfl');
+
+    if (process.env.DISABLE_LLM_CACHE !== 'true' && prevCamp && prevCamp.signature === signature && isSummaryClean) {
       summary = prevCamp.summary;
     } else {
       summary = await generateClusterSummary(cIdx, topStatements);
