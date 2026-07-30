@@ -395,6 +395,110 @@ Kurallar:
   }
 }
 
+/**
+ * Rapor için LLM tabanlı bir Yönetici Özeti üretir.
+ * @param {Object} data - Hesaplanan istatistiksel veriler
+ * @returns {Promise<string>} 3-5 cümlelik nötr Türkçe özet
+ */
+export async function generateExecutiveSummary(data) {
+  const {
+    question,
+    participantsCount,
+    statementsCount,
+    campsCount,
+    polarisability,
+    bridgesCount,
+    bridgesText = [],
+    participationGini,
+    voteCompletionRate
+  } = data;
+
+  const ruleBasedSummary = `Bu raporda, "${question}" konusu üzerine gerçekleştirilen müzakere oturumunda ${participantsCount} katılımcının katılımı ve ${statementsCount} onaylı görüş incelenmiştir. Oturum sonucunda katılımcılar ${campsCount} ana fikir grubuna ayrışmış olup, kutuplaşma derecesi %${polarisability !== null && polarisability !== undefined ? polarisability : '—'} olarak hesaplanmıştır. Oturumda toplam ${bridgesCount} adet uzlaşı/köprü görüş tespit edilmiştir. Katılım eşitliği (Gini katsayısı) ${participationGini !== undefined ? participationGini : '—'} ve oy tamamlama oranı %${voteCompletionRate !== undefined ? voteCompletionRate : '—'} düzeyindedir.`;
+
+  if (process.env.LLM_DRY_RUN === 'true') {
+    logDryRunCall('executive-summary');
+    return `[DRY-RUN] ${ruleBasedSummary}`;
+  }
+
+  if (!openaiClient) {
+    return ruleBasedSummary;
+  }
+
+  try {
+    const bridgesList = bridgesText.length > 0
+      ? bridgesText.map((txt, i) => `${i + 1}. "${txt}"`).join('\n')
+      : 'Ulaşılan ortak uzlaşı görüşü bulunmamaktadır.';
+
+    const prompt = `
+Aşağıdaki verilere dayanarak bir müzakere oturumunun 3-5 cümlelik, tarafsız, profesyonel, akademik ve nötr bir Türkçe "Yönetici Özeti" metnini yaz.
+
+Müzakere Konusu: "${question}"
+Katılımcı Sayısı: ${participantsCount}
+Onaylı Görüş Sayısı: ${statementsCount}
+Fikir Grubu (Kamp) Sayısı: ${campsCount}
+Kutuplaşma Derecesi: %${polarisability !== null && polarisability !== undefined ? polarisability : 'Hesaplanamadı'}
+Köprü (Uzlaşı) Cümle Sayısı: ${bridgesCount}
+Köprü Görüşler:
+${bridgesList}
+Katılım Eşitliği (Gini Katsayısı): ${participationGini !== undefined ? participationGini : 'Hesaplanamadı'} (Not: Değer 0'a yakınsa dengeli katılımı, 1'e yakınsa az sayıda kişinin baskınlığını gösterir)
+Oy Tamamlama Oranı: %${voteCompletionRate !== undefined ? voteCompletionRate : 'Hesaplanamadı'}
+
+Kurallar:
+- Sadece yukarıda verilen sayısal bulguları ve verileri kullanarak bir özet oluştur.
+- KESİNLİKLE yeni bir yorum, öneri, değer yargısı veya veri dışı çıkarım ekleme.
+- Katılımcı isimlerini veya rumuzlarını KESİNLİKLE bu özette geçirme.
+- Metin 3-5 cümleden oluşmalıdır. Akıcı, tarafsız ve düzyazı formatında olmalıdır.
+- Çıktı sadece özet metinden oluşmalıdır. "Thinking Process" veya düşünme adımları KESİNLİKLE çıktıya DAHİL EDİLMEMELİDİR.
+`;
+
+    const response = await openaiClient.chat.completions.create({
+      model: modelName,
+      messages: [
+        { role: 'system', content: 'Sen sadece verilen sayısal ve istatistiksel verileri nötr bir Türkçe metne dönüştüren ve asla düşünme adımlarını/düşünme sürecini çıktıya dahil etmeyen bir analiz asistanısın.' },
+        { role: 'user', content: prompt }
+      ],
+      max_tokens: 800,
+      temperature: 0.3,
+    });
+
+    let summary = response.choices[0]?.message?.content?.trim();
+    if (summary) {
+      // Düşünme etiketlerini ve Thinking Process kısımlarını temizle
+      summary = summary.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+      summary = summary.replace(/^Thinking Process:[\s\S]*?(?=(Bu raporda|Oturumda|Müzakere))/i, '').trim();
+      
+      // Eğer hala 'Thinking Process' içeriyorsa ve sonunda temiz bir paragraf varsa onu al
+      if (summary.toLowerCase().includes('thinking process')) {
+        const paragraphs = summary.split('\n\n').map(p => p.trim()).filter(Boolean);
+        const nonThinking = paragraphs.filter(p => !p.toLowerCase().includes('thinking process') && !p.startsWith('*') && !p.startsWith('-'));
+        if (nonThinking.length > 0) {
+          summary = nonThinking.join('\n\n');
+        }
+      }
+
+      // Herhangi bir Review / constraints / refining bölümü başlarsa oradan sonrasını kes
+      const reviewMatch = summary.match(/\n\n\d+\.\s+\*\*(Review|Refining|Constraint|Revised)/i);
+      if (reviewMatch) {
+        summary = summary.substring(0, reviewMatch.index).trim();
+      }
+
+      const reviewMatch2 = summary.match(/\n\n\*\*Review/i);
+      if (reviewMatch2) {
+        summary = summary.substring(0, reviewMatch2.index).trim();
+      }
+      
+      if (summary && summary.length > 50) {
+        return summary;
+      }
+    }
+    throw new Error('LLM boş veya geçersiz yanıt döndürdü.');
+  } catch (err) {
+    console.error('Yönetici Özeti LLM çağrısı başarısız oldu, kural tabanlı özet kullanılıyor:', err.message);
+    return ruleBasedSummary;
+  }
+}
+
+
 
 
 

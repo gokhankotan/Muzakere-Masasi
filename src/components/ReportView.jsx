@@ -137,18 +137,24 @@ export default function ReportView({ onBack, sessionCode, lang = "tr" }) {
         {/* 1. Yönetici Özeti */}
         <section className="report-section">
           <h2 className="report-section-title"><span className="report-section-num">1.</span>{lang === "tr" ? "Yönetici Özeti" : "Executive Summary"}</h2>
-          <div className="report-abstract">
-            <p>
-              {lang === "tr"
-                ? `Bu rapor, "${question}" konusunda gerçeklestirilen kamusal müzakere oturumunun bulgularini akademik bir çerçevede sunmaktadir. Oturuma ${participantsCount} katilimci katilmis; toplam ${statementsCount} görüs moderasyon sürecinden geçerek degerlendirmeye alinmistir.`
-                : `This report presents findings of a public deliberation session on "${question}". ${participantsCount} participants joined; ${statementsCount} opinions were evaluated after moderation.`}
-            </p>
-            {!analysis?.insufficientData && !analysis?.insufficientVariance && (
-              <p style={{ marginTop: "0.75rem" }}>
-                {lang === "tr"
-                  ? `PCA ve K-Ortalamalar kullanilarak katilimci görüsleri ${analysis?.camps?.length || 0} farkli fikir grubuna ayristirilmistir. Kutuplasma indeksi %${analysis?.polarisability} olarak hesaplanmistir. ${analysis?.bridges?.length > 0 ? `Gruplar arasinda ${analysis.bridges.length} uzlasi görüsü tespit edilmistir.` : "Gruplar arasinda ortak uzlasi noktasi bulunamamistir."}`
-                  : `Using PCA and K-Means, opinions were separated into ${analysis?.camps?.length || 0} groups. Polarization index: ${analysis?.polarisability}%. ${analysis?.bridges?.length > 0 ? `${analysis.bridges.length} consensus opinion(s) found.` : "No consensus opinions found across groups."}`}
-              </p>
+          <div className="report-abstract" style={{ whiteSpace: "pre-line" }}>
+            {reportData.executiveSummary ? (
+              <p>{reportData.executiveSummary}</p>
+            ) : (
+              <>
+                <p>
+                  {lang === "tr"
+                    ? `Bu rapor, "${question}" konusunda gerçekleştirilen kamusal müzakere oturumunun bulgularını akademik bir çerçevede sunmaktadır. Oturuma ${participantsCount} katılımcı katılmış; toplam ${statementsCount} görüş moderasyon sürecinden geçerek değerlendirmeye alınmıştır.`
+                    : `This report presents findings of a public deliberation session on "${question}". ${participantsCount} participants joined; ${statementsCount} opinions were evaluated after moderation.`}
+                </p>
+                {!analysis?.insufficientData && !analysis?.insufficientVariance && (
+                  <p style={{ marginTop: "0.75rem" }}>
+                    {lang === "tr"
+                      ? `PCA ve K-Ortalamalar kullanılarak katılımcı görüşleri ${analysis?.camps?.length || 0} farklı fikir grubuna ayrıştırılmıştır. Kutuplaşma indeksi %${analysis?.polarisability} olarak hesaplanmıştır. ${analysis?.bridges?.length > 0 ? `Gruplar arasında ${analysis.bridges.length} uzlaşı görüşü tespit edilmiştir.` : "Gruplar arasında ortak uzlaşı noktası bulunamamıştır."}`
+                      : `Using PCA and K-Means, opinions were separated into ${analysis?.camps?.length || 0} groups. Polarization index: ${analysis?.polarisability}%. ${analysis?.bridges?.length > 0 ? `${analysis.bridges.length} consensus opinion(s) found.` : "No consensus opinions found across groups."}`}
+                  </p>
+                )}
+              </>
             )}
           </div>
         </section>

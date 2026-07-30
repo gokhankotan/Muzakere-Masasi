@@ -15,7 +15,7 @@ import bcrypt from 'bcrypt';
 import { db } from './database.js';
 import { calculatePCA, runKMeansWithStability, analyzeCampsAndBridges, alignCentroids, calculatePolarisability, calculateKMeans } from './algorithms.js';
 import { authenticateAdmin, passwordRateLimiter, checkParticipantAccess, checkModerator, verifySessionToken, requireSessionOwnership, isSessionOwner } from './middleware/auth.middleware.js';
-import { generateClusterSummary, evaluateOpinionContent, generateAxisLabel, generatePolarizationImpactDescription, discoverConsensusPotential } from './services/llm.service.js';
+import { generateClusterSummary, evaluateOpinionContent, generateAxisLabel, generatePolarizationImpactDescription, discoverConsensusPotential, generateExecutiveSummary } from './services/llm.service.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -551,6 +551,19 @@ app.get('/api/sessions/:code/report', checkParticipantAccess, async (req, res) =
       polarizationImpacts = impacts.sort((a, b) => b.polarizationImpact - a.polarizationImpact).slice(0, 5);
     }
 
+    const execSummaryData = {
+      question: session.question || '',
+      participantsCount: activeParticipants.length,
+      statementsCount: session.statements.length,
+      campsCount: session.analysis?.camps?.length || 0,
+      polarisability: session.analysis?.polarisability !== undefined ? session.analysis.polarisability : null,
+      bridgesCount: session.analysis?.bridges?.length || 0,
+      bridgesText: session.analysis?.bridges ? session.analysis.bridges.map(b => b.text) : [],
+      participationGini: session.analysis?.participationGini,
+      voteCompletionRate: session.analysis?.voteCompletionRate
+    };
+    const executiveSummary = await generateExecutiveSummary(execSummaryData);
+
     res.json({
       code: session.code,
       title: session.title,
@@ -562,6 +575,7 @@ app.get('/api/sessions/:code/report', checkParticipantAccess, async (req, res) =
       statements: session.statements,
       analysis: session.analysis,
       polarizationImpacts,
+      executiveSummary,
       participants: activeParticipants.map(p => ({
         nickname: p.nickname,
         justification: p.justification,
