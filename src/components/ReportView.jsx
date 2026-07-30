@@ -407,38 +407,7 @@ export default function ReportView({ onBack, sessionCode, lang = "tr" }) {
           </>
         )}
 
-        {/* 7. Katilimci Listesi (Ek) */}
-        <section className="report-section">
-          <h2 className="report-section-title">
-            <span className="report-section-num">{analysis?.insufficientData ? "4." : "7."}</span>
-            {lang === "tr" ? "Ek: Katilimci Listesi ve Katilim Gerekçeleri" : "Annex: Participant List and Justifications"}
-          </h2>
-          <p className="report-body-text">
-            {lang === "tr" ? "Katilimcilarin katilim gerekçeleri ve kimlik türleri süreç seffafligi için asagida yer almaktadir." : "Participation justifications and identity types are listed below for process transparency."}
-          </p>
-          <table className="report-table">
-            <thead>
-              <tr>
-                <th style={{ width: "20%" }}>{lang === "tr" ? "Kullanici Adi" : "Username"}</th>
-                <th>{lang === "tr" ? "Katilim Gerekçesi" : "Participation Justification"}</th>
-                <th style={{ width: "12%", textAlign: "center" }}>{lang === "tr" ? "Tür" : "Type"}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {participants && participants.map((p, idx) => (
-                <tr key={idx}>
-                  <td><strong>{p.nickname}</strong></td>
-                  <td style={{ fontSize: "0.88rem", fontStyle: "italic", color: "var(--text-main)" }}>"{p.justification || (lang === "tr" ? "Belirtilmemis." : "Not specified.")}"</td>
-                  <td style={{ textAlign: "center" }}>
-                    <span style={{ background: p.isBot ? "rgba(59, 130, 246, 0.15)" : "rgba(168, 85, 247, 0.15)", color: p.isBot ? "#60a5fa" : "#c084fc", padding: "0.15rem 0.5rem", borderRadius: "4px", fontSize: "0.78rem", fontWeight: 600 }}>
-                      {p.isBot ? (lang === "tr" ? "Simülasyon" : "Simulation") : (lang === "tr" ? "Gerçek" : "User")}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
+
 
         {/* Alt Bilgi */}
         <div className="report-footer">
