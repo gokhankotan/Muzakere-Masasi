@@ -950,16 +950,7 @@ h1, h2, h3, h4, h5, h6 {
   }
 
   /* Rapor dışındaki her şeyi gizle */
-  body > #root > * {
-    display: none !important;
-  }
-
-  /* Raporu görünür tut */
-  body > #root .report-container {
-    display: block !important;
-  }
-
-  /* Kontrol butonları, grafik, nav gizle */
+  .app-header,
   .no-print {
     display: none !important;
   }
