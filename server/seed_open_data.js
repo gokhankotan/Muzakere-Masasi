@@ -155,7 +155,7 @@ async function seedOpenData() {
       }
     }
 
-    // En az 3 oy vermiş olan aktif katılımcılardan ilk 120 tanesini alalım
+    // En az 3 oy vermiş olan aktif katılımcılardan ilk 500 tanesini alalım
     const participants = [];
     for (const [voterId, votes] of voterVotesMap.entries()) {
       if (Object.keys(votes).length >= 3) {
@@ -166,7 +166,7 @@ async function seedOpenData() {
           votes
         });
       }
-      if (participants.length >= 120) break;
+      if (participants.length >= 500) break;
     }
 
     console.log(`  -> Analiz İçin Yüklenen Aktif Katılımcı Sayısı: ${participants.length}`);
@@ -291,16 +291,19 @@ async function seedOpenData() {
       participationGini,
       voteCompletionRate
     };
-    const executiveSummary = await generateExecutiveSummary(execSummaryData);
+    const executiveSummary = await Promise.race([
+      generateExecutiveSummary(execSummaryData),
+      new Promise(res => setTimeout(() => res(null), 4000))
+    ]).catch(() => null);
 
     // 4. Veritabanında Oturumu Oluştur / Upsert Et
     console.log(`  -> Oturum veritabanına kaydediliyor (${ds.code})...`);
 
     // Varolan eski kaydı temizle
-    await prisma.vote.deleteMany({ where: { participant: { session: { code: ds.code } } } }).catch(() => {});
-    await prisma.participant.deleteMany({ where: { session: { code: ds.code } } }).catch(() => {});
-    await prisma.opinion.deleteMany({ where: { session: { code: ds.code } } }).catch(() => {});
-    await prisma.session.deleteMany({ where: { code: ds.code } }).catch(() => {});
+    const existingSession = await prisma.session.findUnique({ where: { code: ds.code } });
+    if (existingSession) {
+      await prisma.session.delete({ where: { id: existingSession.id } }).catch(() => {});
+    }
 
     // Yeni oturumu oluştur
     const createdSession = await prisma.session.create({
