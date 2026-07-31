@@ -84,8 +84,8 @@ describe('Kutuplaşma Derecesi (Polarisability) Birim Testleri', () => {
     const resUnbalanced = calculatePolarisability(pointsUnbalanced, campsUnbalanced);
 
     // Eşit gruplarda kutuplaşma derecesi, dengesiz gruba göre daha yüksek çıkacaktır.
-    expect(resEqual.polarisability).toBe(83);
-    expect(resUnbalanced.polarisability).toBe(75);
+    expect(Math.round(resEqual.polarisability)).toBe(83);
+    expect(Math.round(resUnbalanced.polarisability)).toBe(75);
     expect(resEqual.polarisability).toBeGreaterThan(resUnbalanced.polarisability);
   });
 

@@ -124,7 +124,7 @@ export default function ReportView({ onBack, sessionCode, lang = "tr" }) {
               [lang === "tr" ? "Baslangic Saati" : "Start Time", reportTime],
               [lang === "tr" ? "Toplam Katilimci" : "Total Participants", participantsCount],
               [lang === "tr" ? "Onaylanan Görüs" : "Approved Opinions", statementsCount],
-              [lang === "tr" ? "Kutuplasma Derecesi" : "Polarization Degree", analysis?.insufficientData || analysis?.insufficientVariance ? "—" : `%${analysis?.polarisability}`],
+              [lang === "tr" ? "Kutuplasma Derecesi" : "Polarization Degree", analysis?.insufficientData || analysis?.insufficientVariance || analysis?.polarisability === null || analysis?.polarisability === undefined ? "—" : `%${analysis?.polarisability}`],
             ].map(([label, value], i) => (
               <div key={i} className="report-meta-item">
                 <span className="report-meta-label">{label}</span>
@@ -179,7 +179,7 @@ export default function ReportView({ onBack, sessionCode, lang = "tr" }) {
               [lang === "tr" ? "PCA (Boyutsallik)" : "PCA (Dimensionality)", lang === "tr" ? "Oy matrisini 2B uzaya projeksiyon" : "Projecting vote matrix to 2D space"],
               [lang === "tr" ? "K-Ortalamalar" : "K-Means", lang === "tr" ? "Optimize k ile katilimci gruplama" : "Participant grouping with optimized k"],
               [lang === "tr" ? "Köprü Tespiti" : "Bridge Detection", lang === "tr" ? "Tüm gruplarda ≥%50 onay = uzlasi" : "≥50% approval in all groups = consensus"],
-              [lang === "tr" ? "Kutuplasma Indeksi" : "Polarization Index", lang === "tr" ? "Grup merkezleri arasi agirlikli Öklid uzakligi" : "Weighted Euclidean distance between centroids"],
+              [lang === "tr" ? "Kutuplasma Indeksi" : "Polarization Index", lang === "tr" ? "ANOVA tabanlı Varyans Ayrıştırması (Between/Total-SS %)" : "ANOVA-based Variance Decomposition (Between/Total-SS %)"],
             ].map(([title, body], i) => (
               <div key={i} className="report-method-card">
                 <div className="report-method-title">{title}</div>
@@ -360,12 +360,15 @@ export default function ReportView({ onBack, sessionCode, lang = "tr" }) {
                               </tr>
                             </thead>
                             <tbody>
-                              {camp.topStatements.map((st, sIdx) => (
-                                <tr key={sIdx}>
-                                  <td><em>"{st.text}"</em></td>
-                                  <td style={{ textAlign: "center", fontWeight: 600, color: "var(--color-agree)" }}>%{st.approvalRate}</td>
-                                </tr>
-                              ))}
+                              {camp.topStatements.map((st, sIdx) => {
+                                const statementText = st.text || st.statement?.text || "";
+                                return (
+                                  <tr key={sIdx}>
+                                    <td><em>"{statementText}"</em></td>
+                                    <td style={{ textAlign: "center", fontWeight: 600, color: "var(--color-agree)" }}>%{st.approvalRate}</td>
+                                  </tr>
+                                );
+                              })}
                             </tbody>
                           </table>
                         ) : (

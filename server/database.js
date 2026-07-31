@@ -292,7 +292,7 @@ class Database {
           points: [],
           camps: [],
           bridges: [],
-          polarisability: 0
+          polarisability: null
         };
         if (dbSession.analysis) {
           analysis = typeof dbSession.analysis === 'string' 
@@ -361,21 +361,12 @@ class Database {
   }
 
   getSessionSync(code) {
-    if (!code) return null;
-    const upperCode = String(code).trim().toUpperCase();
-    return this.sessions.get(upperCode) || null;
+    return this.sessions.get(code) || null;
   }
 
   async getSessionByCode(code) {
     await this.initialized;
-    if (!code) return null;
-    const upperCode = String(code).trim().toUpperCase();
-    let session = this.sessions.get(upperCode);
-    if (!session && this.isPrismaActive) {
-      await this.loadSessionsFromDB();
-      session = this.sessions.get(upperCode);
-    }
-    return session || null;
+    return this.sessions.get(code) || null;
   }
 
   createSessionSync({ code, title, description, question, visibility, passwordHash = null, passwordText = null, creatorId = null, skipDefaultStatements = false }) {
@@ -399,7 +390,7 @@ class Database {
         points: [],
         camps: [],
         bridges: [],
-        polarisability: 0
+        polarisability: null
       },
       targetK: 3,
       customCampNames: {},
@@ -803,7 +794,7 @@ class Database {
       points: [],
       camps: [],
       bridges: [],
-      polarisability: 0
+      polarisability: null
     };
     session.polarizationHistory = [];
     session.status = 'archived';
@@ -820,7 +811,7 @@ class Database {
               points: [],
               camps: [],
               bridges: [],
-              polarisability: 0
+              polarisability: null
             },
             polarizationHistory: []
           }

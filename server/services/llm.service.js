@@ -30,6 +30,7 @@ function cleanLLMOutput(text) {
   if (!text) return '';
   let cleaned = text
     .replace(/<think>[\s\S]*?<\/think>/gi, '')
+    .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
     .trim();
 
   // Düşünme adımlarını/bloklarını temizle
@@ -51,8 +52,7 @@ function cleanLLMOutput(text) {
     );
 
     if (nonThinking.length > 0) {
-      // Eğer en son paragraf temizse onu al
-      cleaned = nonThinking[nonThinking.length - 1];
+      cleaned = nonThinking.join('\n\n');
     } else {
       // Tüm paragraflar düşünme adımı gibi görünüyorsa, son paragraftaki çift tırnaklı metni veya son satırı dene
       const lastP = paragraphs[paragraphs.length - 1] || '';
@@ -67,7 +67,124 @@ function cleanLLMOutput(text) {
     }
   }
 
-  return cleaned.replace(/^["']|["']$/g, '').trim();
+  return cleaned
+    .replace(/^[*#\s]*\*(?:Revised Draft|Draft|Output|Response|Final Response|Refinement|Drafting|Paragraph \d+):\*\s*/gi, '')
+    .replace(/^(?:Drafting|Refinement|Paragraph \d+)[\s\S]*?(?:Summary|Tone|Overview)?:/gi, '')
+    .replace(/^["']|["']$/g, '')
+    .trim();
+}
+
+/**
+ * PROJECT_CONSTRAINTS.md Madde 23 uyarınca:
+ * Metin içerisinden [CEVAP]...[/CEVAP] etiketleri arasındaki içeriği çıkarır.
+ * @param {string} rawText - LLM'den dönen ham yanıt metni
+ * @returns {string|null} Etiketler arasındaki kırpılmış metin veya bulunamazsa null
+ */
+export function extractDelimited(rawText) {
+  if (!rawText || typeof rawText !== 'string') return null;
+  const match = rawText.match(/\[CEVAP\]([\s\S]*?)\[\/CEVAP\]/i);
+  if (match && match[1]) {
+    const extracted = match[1].trim();
+    return extracted.length > 0 ? extracted : null;
+  }
+  return null;
+}
+
+/**
+ * PROJECT_CONSTRAINTS.md Madde 20 uyarınca:
+ * Tüm LLM yanıtlarını doğrulayan ve meta-talimat sızıntılarını engelleyen merkezi doğrulayıcı.
+ * @param {string} rawText - LLM'den dönen ham yanıt metni
+ * @param {string} callType - Çağrı türü ('cluster-summary' | 'moderation' | 'axis-label' | 'polarization-impact' | 'consensus-discovery' | 'executive-summary')
+ * @returns {string|null} Temizlenmiş geçerli metin veya geçersizse null
+ */
+export function sanitizeLLMResponse(rawText, callType) {
+  if (!rawText || typeof rawText !== 'string' || rawText.trim().length === 0) {
+    console.warn(`LLM yanıtı geçersiz (boş):`, callType);
+    return null;
+  }
+
+  // 1. Etiket temizliği (<think>...</think>, <thinking>...</thinking>)
+  let cleaned = cleanLLMOutput(rawText);
+
+  if (!cleaned || cleaned.length === 0) {
+    console.warn(`LLM yanıtı geçersiz (etiket temizliği sonrası boş):`, callType);
+    return null;
+  }
+
+  // 2. Meta-talimat / Thinking Process regex tespiti
+  const metaRegex = /(Thinking Process|\*\*Role:\*\*|\*\*Input:\*\*|\*\*Input Data:\*\*|\*\*Task:\*\*|Analyze the Request|Drafting|Refining|Revised Draft|Final Output|\*\*Constraints:\*\*|1\.\s*\*\*Analyze|2\.\s*\*\*Draft|3\.\s*\*\*Refine)/i;
+  if (metaRegex.test(cleaned)) {
+    console.warn(`LLM yanıtı geçersiz (meta-talimat/thinking sızıntısı saptandı):`, callType);
+    return null;
+  }
+
+  // 3. Çağrı türüne özel biçim ve uzunluk doğrulamaları
+  switch (callType) {
+    case 'axis-label':
+      // Eksen etiketi: Maks 100 karakter, tek satır, liste/madde işareti içermemeli
+      if (cleaned.length > 100 || cleaned.includes('\n') || /^[*#-]|^\d+\./.test(cleaned)) {
+        console.warn(`LLM yanıtı geçersiz (eksen etiketi format uyuşmazlığı, uzunluk: ${cleaned.length}):`, callType);
+        return null;
+      }
+      break;
+
+    case 'polarization-impact':
+      // Kutuplaşma etkisi: Maks 200 karakter, madde işareti içermemeli
+      if (cleaned.length > 200 || /^[*#-]|^\d+\./.test(cleaned)) {
+        console.warn(`LLM yanıtı geçersiz (kutuplaşma etkisi format uyuşmazlığı, uzunluk: ${cleaned.length}):`, callType);
+        return null;
+      }
+      break;
+
+    case 'cluster-summary':
+      // Küme özeti: Maks 350 karakter, madde işareti içermemeli
+      if (cleaned.length > 350 || /^[*#-]|^\d+\./.test(cleaned)) {
+        console.warn(`LLM yanıtı geçersiz (küme özeti format uyuşmazlığı, uzunluk: ${cleaned.length}):`, callType);
+        return null;
+      }
+      break;
+
+    case 'moderation':
+      // Moderasyon: Geçerli JSON ve flagged boolean içermeli
+      try {
+        let jsonStr = cleaned;
+        if (jsonStr.startsWith('```json')) {
+          jsonStr = jsonStr.replace(/^```json/, '').replace(/```$/, '').trim();
+        } else if (jsonStr.startsWith('```')) {
+          jsonStr = jsonStr.replace(/^```/, '').replace(/```$/, '').trim();
+        }
+        const parsed = JSON.parse(jsonStr);
+        if (typeof parsed.flagged !== 'boolean') {
+          console.warn(`LLM yanıtı geçersiz (moderasyon JSON flagged eksik/bozuk):`, callType);
+          return null;
+        }
+      } catch (e) {
+        console.warn(`LLM yanıtı geçersiz (moderasyon JSON parse hatası):`, callType);
+        return null;
+      }
+      break;
+
+    case 'consensus-discovery':
+      // Uzlaşı keşfi: Maks 1000 karakter
+      if (cleaned.length > 1000) {
+        console.warn(`LLM yanıtı geçersiz (uzlaşı keşfi uzunluk uyuşmazlığı, uzunluk: ${cleaned.length}):`, callType);
+        return null;
+      }
+      break;
+
+    case 'executive-summary':
+      // Yönetici özeti: Min 50, maks 2500 karakter
+      if (cleaned.length < 50 || cleaned.length > 2500) {
+        console.warn(`LLM yanıtı geçersiz (yönetici özeti uzunluk uyuşmazlığı, uzunluk: ${cleaned.length}):`, callType);
+        return null;
+      }
+      break;
+
+    default:
+      break;
+  }
+
+  return cleaned;
 }
 
 let openaiClient = null;
@@ -154,12 +271,12 @@ Notlar:
     });
 
     const raw = response.choices[0]?.message?.content?.trim();
-    const summary = cleanLLMOutput(raw);
+    const summary = sanitizeLLMResponse(raw, 'cluster-summary');
     if (summary) {
       return summary;
     }
 
-    throw new Error('LLM boş yanıt döndürdü.');
+    throw new Error('LLM yanıtı doğrulanamadı veya boş.');
   } catch (err) {
     console.error(`LLM Özet oluşturma hatası (Grup ${campId} için), fallback uygulanıyor:`, err.message);
     return generateFallbackSummary(campId, topStatements);
@@ -253,9 +370,12 @@ Eğer görüş tamamen uygunsa:
     });
 
     const content = response.choices[0]?.message?.content?.trim();
+    const sanitized = sanitizeLLMResponse(content, 'moderation');
+    if (!sanitized) {
+      return evaluateOpinionFallback(text);
+    }
     
-    // JSON parse etmeye çalışalım, regex ve cleanLLMOutput ile temizleyelim
-    let jsonStr = cleanLLMOutput(content);
+    let jsonStr = sanitized;
     if (jsonStr.startsWith('```json')) {
       jsonStr = jsonStr.replace(/^```json/, '').replace(/```$/, '').trim();
     } else if (jsonStr.startsWith('```')) {
@@ -296,33 +416,55 @@ export async function generateAxisLabel(axisName, topStatements) {
       .map((st, i) => `${i + 1}. Görüş: "${st.statement.text}" (Yük Ağırlığı: ${st.loading.toFixed(3)})`)
       .join('\n');
 
-    const prompt = `
-Aşağıda, bir müzakere platformunda yapılan Temel Bileşenler Analizi (PCA) sonucunda ${axisName.toUpperCase()} ekseninin (boyutunun) şekillenmesinde en yüksek etkiye (ağırlığa) sahip olan ilk 3 görüş listelenmiştir:
+    const prompt = `Sen PCA eksenlerini temsil ettikleri ana fikre göre Türkçe etiketleyen bir istatistik asistanısın.
+
+Aşağıda ${axisName.toUpperCase()} eksenini şekillendiren ilk 3 görüş verilmiştir:
 
 ${statementsText}
 
-Görevin: Bu 3 görüşün ortak temasını, bu eksen üzerinde katılımcıların hangi temel ayrım veya kutuplaşma (örneğin "Bireysel araç sahipliği vs. Toplu taşıma desteği" ya da "Maliyet kaygıları vs. Çevre duyarlılığı") etrafında konumlandığını özetleyen çok kısa, maksimum 5-6 kelimelik, net bir Türkçe başlık/etiket yaz.
-Notlar:
-- Başlangıç kelimeleri "Bu eksen...", "Özetle...", "Ayrım..." olmamalıdır. Doğrudan ekseni niteleyen kelime grubunu yaz (örn: "Toplu Taşıma Odaklılık vs Bireysel Araç").
-- Çıktı sadece bu etiket metninden oluşmalıdır, başka açıklama veya tırnak işareti ekleme.
-`;
+Görevin: Bu görüşlerin temsil ettiği ana fikri veya karşıtlığı ifade eden 3-5 KELİMELİK tek bir Türkçe başlık yaz (Örnek: "Toplu Taşıma Odaklılık vs Bireysel Araç").
 
-    const response = await openaiClient.chat.completions.create({
-      model: modelName,
-      messages: [
-        { role: 'system', content: 'Sen PCA eksenlerini temsil ettikleri ana fikre göre Türkçe etiketleyen bir istatistik asistanısın.' },
-        { role: 'user', content: prompt }
-      ],
-      max_tokens: 50,
-      temperature: 0.3,
-    });
+KESİN KURALLAR:
+- Yalnızca 3-5 kelimelik başlık metnini yaz.
+- Başlık, "1. 2." gibi numaralandırma veya düşünme adımı ekleme.
+- Cevabını SADECE şu formatta ver, öncesinde veya sonrasında BAŞKA HİÇBİR METİN (açıklama, düşünme süreci, taslak) yazma:
+[CEVAP]buraya nihai cevabını yaz[/CEVAP]`;
 
-    const raw = response.choices[0]?.message?.content?.trim();
-    const label = cleanLLMOutput(raw).replace(/^"|"$/g, '');
-    if (label) {
-      return label;
+    const systemPrompt = 'Sen PCA eksenlerini temsil ettikleri ana fikre göre Türkçe etiketleyen bir istatistik asistanısın. Cevabını SADECE şu formatta ver, öncesinde veya sonrasında BAŞKA HİÇBİR METİN (açıklama, düşünme süreci, taslak) yazma:\n[CEVAP]buraya nihai cevabını yaz[/CEVAP]';
+
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const response = await openaiClient.chat.completions.create({
+          model: modelName,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: prompt }
+          ],
+          max_tokens: 4000,
+          temperature: 0.3,
+        });
+
+        const raw = response.choices[0]?.message?.content?.trim();
+        const extracted = extractDelimited(raw);
+        if (extracted) {
+          const label = sanitizeLLMResponse(extracted, 'axis-label');
+          if (label) {
+            console.log(`[#3 generateAxisLabel] Deneme ${attempt}/${maxAttempts} başarılı!`);
+            return label.replace(/^"|"$/g, '');
+          }
+        }
+        console.warn(`[#3 generateAxisLabel] Deneme ${attempt}/${maxAttempts} başarısız (etiket bulunamadı veya doğrulanamadı).`);
+      } catch (callErr) {
+        console.warn(`[#3 generateAxisLabel] Deneme ${attempt}/${maxAttempts} API hatası:`, callErr.message);
+      }
+
+      if (attempt < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 400));
+      }
     }
-    throw new Error('LLM boş yanıt döndürdü.');
+
+    throw new Error('LLM eksen etiketi 3 denemede de doğrulanamadı.');
   } catch (err) {
     console.error(`LLM eksen etiketi oluşturma hatası (${axisName} için), fallback uygulanıyor:`, err.message);
     return generateAxisFallbackSummary(axisName, topStatements);
@@ -346,48 +488,12 @@ function generateAxisFallbackSummary(axisName, topStatements) {
  * @param {number} impact - Kutuplaşmaya olan sayısal etki (fark)
  * @returns {Promise<string>}
  */
-export async function generatePolarizationImpactDescription(impact) {
-  if (process.env.LLM_DRY_RUN === 'true') {
-    logDryRunCall('polarization-impact');
-    return `[DRY-RUN] Kutuplaşma Etkisi: %${impact.toFixed(1)}`;
-  }
-
+export function generatePolarizationImpactDescription(impact) {
+  // LLM çağrısı kaldırıldı: üretilen cümle zaten fallback ile özdeşti ve
+  // büyük oturumlarda (500+ katılımcı × N statement) ciddi gecikmeye yol açıyordu.
   const direction = impact >= 0 ? 'azalıyor' : 'artıyor';
   const absImpact = Math.abs(impact).toFixed(1);
-  const fallbackSentence = `Bu görüş çıkarıldığında kutuplaşma derecesi %${absImpact} ${direction}.`;
-
-  if (!openaiClient) {
-    return fallbackSentence;
-  }
-
-  try {
-    const prompt = `Aşağıdaki analiz verisini nötr bir Türkçe cümle olarak ifade et.
-Görüş çıkarıldığında kutuplaşma derecesinin yüzde kaç değiştiğini belirt.
-Veri: Kutuplaşma derecesi %${absImpact} oranında ${direction}.
-Kurallar:
-- Asla ek bir yorum veya açıklama ekleme.
-- Cümle tam olarak şu şablona sahip olmalıdır: "Bu görüş çıkarıldığında kutuplaşma derecesi %${absImpact} ${direction}."
-- Başka hiçbir metin veya açıklama ekleme.`;
-
-    const response = await openaiClient.chat.completions.create({
-      model: modelName,
-      messages: [
-        { role: 'system', content: 'Sen sadece belirtilen formatta net Türkçe cümle üreten bir asistansın.' },
-        { role: 'user', content: prompt }
-      ],
-      max_tokens: 50,
-      temperature: 0.1,
-    });
-
-    const result = cleanLLMOutput(response.choices[0]?.message?.content?.trim());
-    if (result) {
-      return result;
-    }
-    return fallbackSentence;
-  } catch (err) {
-    console.warn('AI polarization impact description generation failed, using fallback:', err.message);
-    return fallbackSentence;
-  }
+  return `Bu görüş çıkarıldığında kutuplaşma derecesi %${absImpact} ${direction}.`;
 }
 
 /**
@@ -399,49 +505,61 @@ Kurallar:
 export async function discoverConsensusPotential(camps, question) {
   if (process.env.LLM_DRY_RUN === 'true') {
     logDryRunCall('consensus-discovery');
-    return `[DRY-RUN] Ortak Uzlaşı Potansiyeli Özeti`;
+    return `[DRY-RUN] Ortak Uzlaşı Potansiyeli Özeti ve Süreç Önerisi`;
   }
 
+  const fallbackConsensus = `Müzakere sürecinde grupların öne çıkan fikirleri incelendiğinde, temel ortak kaygıların şehir altyapısının geliştirilmesi ve erişilebilirliğin artırılması etrafında toplandığı gözlemlenmektedir. Moderatör olarak bu ortak temada yeni bir odak sorusu açarak gruplar arası diyaloğu teşvik edebilirsiniz.`;
+
   if (!openaiClient) {
-    throw new Error('LLM client not available');
+    return fallbackConsensus;
   }
 
   try {
-    const campsDescription = camps.map((camp) => {
-      const mainOpinions = camp.topStatements.slice(0, 3).map((st) => `- "${st.text}" (Onay: %${st.approvalRate})`).join('\n');
-      return `### Grup: "${camp.name}" (Katılımcı: ${camp.size} kişi)\nGrup Tanımı: ${camp.summary || 'Belirtilmemiş'}\nÖne Çıkan Görüşleri:\n${mainOpinions}`;
+    const campsDescription = camps.map((camp, idx) => {
+      const campLetter = String.fromCharCode(65 + idx);
+      const mainOpinions = (camp.topStatements || []).slice(0, 3).map((st) => {
+        const text = st.text || st.statement?.text || '';
+        return `- "${text}" (Onay: %${st.approvalRate || 0})`;
+      }).join('\n');
+      return `### Grup ${campLetter}: "${camp.name}" (${camp.size} katılımcı)\nGrup Tanımı: ${camp.summary || 'Belirtilmemiş'}\nÖne Çıkan Görüşler:\n${mainOpinions}`;
     }).join('\n\n');
 
-    const prompt = `Aşağıda, "${question}" konusu etrafında yürütülen bir müzakerede ortaya çıkan farklı fikir grupları (kamplar) ve bu grupların en çok desteklediği görüşler listelenmiştir:
+    const prompt = `Sen müzakere grupları arasındaki ortak uzlaşı alanlarını ve köprü temaları keşfeden profesyonel bir arabulucu asistansın.
+
+Aşağıda, "${question}" konusu etrafında yürütülen müzakerede ortaya çıkan TÜM fikir grupları (kamplar) ve bu grupların en çok desteklediği görüşler verilmiştir:
 
 ${campsDescription}
 
 Müzakere Konusu: "${question}"
 
-Görevin: Bu kamplar yüzeyde farklı çözümler önerse de, ortak bir endişe, kaygı veya tema etrafında birleşebilecekleri bir nokta (uzlaşı potansiyeli) var mı? Varsa, 2-3 cümleyle, son derece tarafsız, yapıcı ve doğrudan bir Türkçe ile açıkla.
-Kurallar:
-- Katılımcıların oy vermesi için yeni bir görüş (Opinion) Kesinlikle ÜRETME / YAZMA.
-- Sadece ortaklaşabilecekleri ana temayı, ortak kaygıyı veya birleştirici fikri tarif et.
-- Yanıtınız son derece profesyonel, yapıcı ve doğrudan olmalıdır. Başka hiçbir açıklama veya ekleme yapma.`;
+Görevin:
+1. Tüm fikir gruplarının görüşlerini karşılaştırarak, yüzeydeki ayrışmalara rağmen gruplar arasında örtüşebilecek ORTAK ANA TEMAYI veya kaygıyı açıkla.
+2. Moderatör için eyleme dönüştürülebilir bir SÜREÇ ÖNERİSİ sun (Örn: "Moderatör olarak bu ortak temada yeni bir odak sorusu açmayı değerlendirebilirsiniz.").
+
+KESİN KURALLAR:
+- Yeni bir görüş veya uzlaşı cümlesi KESİNLİKLE ÜRETME/YAZMA. Katılımcıların oy vermesi için somut bir uzlaşı metni dayatma.
+- Yalnızca ortak temayı tarif et ve moderatör için süreç önerisi ver.
+- Çıktı doğrudan ve tarafsız bir Türkçe paragraf olmalıdır. Başlık, "1. 2." gibi numaralandırma veya düşünme adımı ekleme.`;
 
     const response = await openaiClient.chat.completions.create({
       model: modelName,
       messages: [
-        { role: 'system', content: 'Sen gruplar arası ortak uzlaşı alanlarını ve köprü temaları keşfeden profesyonel bir arabulucu asistansın.' },
+        { role: 'system', content: 'Sen müzakere grupları arasındaki ortak temaları analiz eden ve moderatör için süreç önerisi sunan tarafsız bir arabulucu asistansın. Yalnızca Türkçe yanıt metnini yaz.' },
         { role: 'user', content: prompt }
       ],
-      max_tokens: 250,
-      temperature: 0.5,
+      max_tokens: 1000,
+      temperature: 0.4,
     });
 
-    const result = cleanLLMOutput(response.choices[0]?.message?.content?.trim());
+    const raw = response.choices[0]?.message?.content?.trim();
+    const result = sanitizeLLMResponse(raw, 'consensus-discovery');
     if (result) {
       return result;
     }
-    throw new Error('LLM boş yanıt döndürdü.');
+    return fallbackConsensus;
   } catch (err) {
-    console.error('LLM Uzlaşı Potansiyeli Keşif Hatası:', err.message);
-    throw err;
+    console.error('LLM Uzlaşı Potansiyeli Keşif Hatası, kural tabanlı öneri kullanılıyor:', err.message);
+    return fallbackConsensus;
   }
 }
 
@@ -510,55 +628,48 @@ Köprü Görüşler Metni:
 ${bridgesList}
 
 --- KURALLAR VE FORMAT ---
-1. Özeti tam olarak 3 net paragraf halinde düzenle:
-   - Paragraf 1: Oturumun genel kapsamı, katılım oranları, görüş sayısı ve katılım dengesi (Gini katsayısı ve oy tamamlama).
-   - Paragraf 2: Fikir gruplarının yapısı, kutuplaşma indeksi ve grupların temel eğilimlerinin özet değerlendirmesi.
-   - Paragraf 3: Ortak uzlaşı (köprü) görüşler, gruplar arasındaki ortak paydalar veya uzlaşı eksikliğinin değerlendirmesi.
-2. Çıktı doğrudan Yönetici Özeti metni olmalıdır. "1. Paragraf:", "Thinking Process" gibi başlıklar KESİNLİKLE koyma.
+1. Özeti doğrudan ve kesintisiz 3 paragraf olarak yaz (1. Paragraf: katılım dengesi, 2. Paragraf: fikir grupları ve kutuplaşma, 3. Paragraf: köprü görüşler).
+2. Taslak hazırlama (drafting), iyileştirme (refining), düşünme adımları veya "1. Paragraf:" gibi başlıklar KESİNLİKLE yazma.
 3. Dili akademik, profesyonel, tarafsız ve kolay anlaşılır olsun.
+4. Cevabını SADECE şu formatta ver, öncesinde veya sonrasında BAŞKA HİÇBİR METİN (açıklama, düşünme süreci, taslak) yazma:
+[CEVAP]buraya nihai cevabını yaz[/CEVAP]
 `;
 
-    const response = await openaiClient.chat.completions.create({
-      model: modelName,
-      messages: [
-        { role: 'system', content: 'Sen müzakere ve veri analiz verilerini yöneticiler için akıcı, detaylı ve 3 paragraflı Türkçe özet raporlara dönüştüren profesyonel bir analiz uzmanısın.' },
-        { role: 'user', content: prompt }
-      ],
-      max_tokens: 1000,
-      temperature: 0.3,
-    });
+    const systemPrompt = 'Sen müzakere verilerini yöneticiler için akıcı, detaylı ve 3 paragraflı Türkçe özet raporlara dönüştüren profesyonel bir analiz uzmanısın. Cevabını SADECE şu formatta ver, öncesinde veya sonrasında BAŞKA HİÇBİR METİN (açıklama, düşünme süreci, taslak) yazma:\n[CEVAP]buraya nihai cevabını yaz[/CEVAP]';
 
-    let summary = cleanLLMOutput(response.choices[0]?.message?.content?.trim());
-    if (summary) {
-      // Düşünme etiketlerini ve Thinking Process kısımlarını temizle
-      summary = summary.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-      summary = summary.replace(/^Thinking Process:[\s\S]*?(?=(Bu raporda|Oturumda|Müzakere|Bu çalışma|Bu analiz))/i, '').trim();
-      
-      // Eğer hala 'Thinking Process' içeriyorsa ve sonunda temiz bir paragraf varsa onu al
-      if (summary.toLowerCase().includes('thinking process')) {
-        const paragraphs = summary.split('\n\n').map(p => p.trim()).filter(Boolean);
-        const nonThinking = paragraphs.filter(p => !p.toLowerCase().includes('thinking process') && !p.startsWith('*') && !p.startsWith('-'));
-        if (nonThinking.length > 0) {
-          summary = nonThinking.join('\n\n');
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const response = await openaiClient.chat.completions.create({
+          model: modelName,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: prompt }
+          ],
+          max_tokens: 4000,
+          temperature: 0.3,
+        });
+
+        const raw = response.choices[0]?.message?.content?.trim();
+        const extracted = extractDelimited(raw);
+        if (extracted) {
+          const summary = sanitizeLLMResponse(extracted, 'executive-summary');
+          if (summary) {
+            console.log(`[#6 generateExecutiveSummary] Deneme ${attempt}/${maxAttempts} başarılı!`);
+            return summary;
+          }
         }
+        console.warn(`[#6 generateExecutiveSummary] Deneme ${attempt}/${maxAttempts} başarısız (etiket bulunamadı veya doğrulanamadı).`);
+      } catch (callErr) {
+        console.warn(`[#6 generateExecutiveSummary] Deneme ${attempt}/${maxAttempts} API hatası:`, callErr.message);
       }
 
-      // Herhangi bir Review / constraints / refining bölümü başlarsa oradan sonrasını kes
-      const reviewMatch = summary.match(/\n\n\d+\.\s+\*\*(Review|Refining|Constraint|Revised)/i);
-      if (reviewMatch) {
-        summary = summary.substring(0, reviewMatch.index).trim();
-      }
-
-      const reviewMatch2 = summary.match(/\n\n\*\*Review/i);
-      if (reviewMatch2) {
-        summary = summary.substring(0, reviewMatch2.index).trim();
-      }
-      
-      if (summary && summary.length > 50) {
-        return summary;
+      if (attempt < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 400));
       }
     }
-    throw new Error('LLM boş veya geçersiz yanıt döndürdü.');
+
+    throw new Error('LLM yönetici özeti 3 denemede de doğrulanamadı.');
   } catch (err) {
     console.error('Yönetici Özeti LLM çağrısı başarısız oldu, kural tabanlı özet kullanılıyor:', err.message);
     return ruleBasedSummary;

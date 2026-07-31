@@ -502,3 +502,143 @@ planı ve onayıyla, birbirine karışmadan uygulanmalı.
   modunda 10-15 dakika çalıştırılır, log'dan toplam ve tip-bazlı çağrı sayısı
   çıkarılıp kurumun kotasıyla karşılaştırılır. Bu, önceki manuel/tahmini
   kota konuşmasının yerine somut bir sayıyla gelir.
+
+## 19. Rapor LLM Özeti, Görsel/UI Düzeltmeleri, Matematiksel Doğrulama
+
+- **Yönetici özeti (6. LLM çağrı noktası):** Rapor oluşturulduğunda (SADECE
+  rapor talebinde, periyodik/canlı analizde DEĞİL), mevcut LLM entegrasyonu
+  ile oturumun genel özeti (kamp sayısı, kutuplaşma derecesi, köprü cümle
+  sayısı, katılım eşitliği gibi zaten hesaplanmış verilerden) nötr bir
+  Türkçe metin olarak üretilir. LLM burada YENİ bir yorum/karar üretmez,
+  sadece zaten hesaplanmış sayısal bulguları düzyazıya çevirir. LLM
+  başarısız olursa, kural tabanlı bir şablon özet (mevcut fallback
+  desenine uygun) gösterilir, rapor asla LLM'siz kalmaz. Katılımcı isimleri
+  ASLA bu özette geçmez. Bu, kurumla paylaşılacak toplam LLM çağrı noktası
+  sayısını 5'ten 6'ya çıkarır — pilot öncesi kota konuşması buna göre
+  güncellenmeli.
+- **Eksen etiketleri haritanın DIŞINA yerleştirilir:** A1 özelliğinin
+  ürettiği eksen etiketleri, veri noktalarının üzerine binmeyecek şekilde
+  grafik alanının dışında (kenarlarda) gösterilir — okunabilirlik önceliği.
+- **Kamp renk ataması, dinamik K değerine göre ölçeklenir:** Renk ataması
+  sabit/sınırlı bir diziye (ör. sadece 3-4 renk) bağlı KALMAMALI — K
+  değeri admin tarafından artırıldığında (madde 15/A2 ile ilişkili),
+  her yeni kamp için de görsel olarak ayırt edilebilir bir renk otomatik
+  üretilmeli (ör. HSL renk çemberinde eşit aralıklarla dönen bir üretim
+  mantığı, sabit dizi değil).
+- **Yönetici panelindeki tekrarlayan gezinme linkleri kaldırılır:** Üst
+  gezinme çubuğunda zaten bulunan "Canlı Ekran" ve "Rapor" linkleri, admin
+  panel içeriğinde TEKRAR gösterilmez (UI temizliği, işlevsel bir
+  kayıp değil).
+- **Yazdırma bug'ı, i18n eksikliği, koyu temada görünmeyen başlıklar:**
+  Üçü de "önce teşhis et, sonra düzelt" sırasıyla ele alınır — kör
+  düzeltme yapılmaz, önce neden bozuk olduğu raporlanır.
+- **Matematiksel/algoritmik doğruluk testi (kapsamlı):** Şimdiye kadar
+  eklenen TÜM analiz bileşenleri için, bilinen-cevaplı (known-answer) test
+  vektörleriyle doğrulama yapılır — gerçek koda karşı çalıştırılan, elle
+  hesaplanmış beklenen sonuçlarla karşılaştırılan testler. Kapsam: PCA
+  (varyans açıklama), KMeans (net ayrışmış sentetik veri), kutuplaşma
+  formülü (madde 14, elle hesaplanmış küçük örnek), Gini katsayısı (madde
+  15/B4, tam eşit ve tam eşitsiz uç durumlar), oy tamamlama oranı (madde
+  15/B5), köprü cümle eşiği (madde 5), küme kararlılığı skoru (madde 11),
+  aykırı değer tespiti (madde 15/A3), leave-one-out kutuplaşma etkisi
+  (madde 17). Bu, önceki `authorization-matrix.test.js`'ten AYRI bir test
+  dosyasıdır (yetki değil, matematik doğruluğu test edilir).
+
+## 20. LLM Çıktı Sızıntısı Düzeltmesi (Thinking Process / Prompt Leak Bug)
+
+- **Sorun:** Eksen etiketleme ve kutuplaşma etkisi anlatımı gibi LLM
+  çıktılarında, modelin nihai cevap yerine kendi "thinking process"ini
+  veya sistem promptunun neredeyse birebir kopyasını döndürdüğü
+  gözlemlendi (ekran görüntüleriyle doğrulandı).
+- **Zorunlu düzeltme:** Her LLM çağrısının çıktısı, kullanıcıya
+  gösterilmeden ÖNCE bir doğrulama/temizleme katmanından geçmeli:
+  1. Yanıt, `<think>...</think>` benzeri etiketler içeriyorsa ayıklanmalı.
+  2. Yanıt, "Thinking Process", "**Role:**", "**Input:**", "Analyze the
+     Request" gibi meta-talimat kalıpları içeriyorsa (regex ile tespit),
+     bu YANIT GEÇERSİZ sayılmalı — kullanıcıya gösterilmemeli, bunun
+     yerine mevcut kural tabanlı fallback devreye girmeli.
+  3. Beklenen çıktı formatı (ör. "kısa bir Türkçe cümle") ile gerçek
+     çıktının uzunluğu/yapısı tutarsızsa (ör. 500+ karakter, madde
+     içeren bir liste vb.) da fallback'e düşülmeli.
+- Bu doğrulama katmanı TEK bir ortak fonksiyon olarak yazılmalı ve TÜM
+  6 LLM çağrı noktasında (küme özeti, moderasyon, eksen etiketi,
+  kutuplaşma etkisi, uzlaşı keşfi, yönetici özeti) kullanılmalı — her
+  çağrı noktasında ayrı ayrı temizleme mantığı yazılmamalı.
+
+## 21. Rapor Boş Görüş Bug'ı, Uzlaşı Paneli Genişletmesi, Duraklatılan Oturum Kısıtlaması
+
+- **Rapor — kamp karakteristik görüşleri boş ("") görünüyor:** Bug, önce
+  teşhis edilmeli. En olası neden: madde 16/Değişiklik 3'te (oylama
+  ekranında yazar adını gizleme) yapılan değişikliğin, yanlışlıkla yazar
+  bilgisiyle BİRLİKTE görüş İÇERİĞİNİ de gizlemiş/kaldırmış olması —
+  bu iki alan (yazar adı, görüş metni) birbirinden bağımsız kalmalı,
+  sadece yazar adı gizlenmeli, `content`/`text` alanı ASLA boşaltılmamalı.
+- **Uzlaşı Potansiyeli Keşif Paneli genişletmesi:** Panel artık SADECE tek
+  bir kampın başlığını değil, TÜM kamplar arası potansiyel örtüşmeyi ve
+  bir SÜREÇ önerisi sunmalı. Süreç önerisi ile içerik dayatması arasındaki
+  sınır KESİN: "Bu temada yeni bir soru açmayı düşünebilirsiniz" gibi bir
+  SÜREÇ önerisi VERİLEBİLİR; "Bu iki kamp şu konuda anlaşmalı/şu cümlede
+  birleşebilir" gibi somut bir İÇERİK/UZLAŞI METNİ dayatması VERİLEMEZ —
+  madde 17'deki "yeni görüş üretme" yasağı bu haliyle KORUNUR, sadece
+  "süreç önerisi" eklenmesine izin verilir.
+- **Duraklatılmış (paused) oturumda katılımcı kısıtlaması:** Bir oturum
+  `status: paused` olduğunda: (a) yeni katılımcılar giriş ekranından
+  KATILAMAZ, giriş ekranında "Bu oturum duraklatıldı" mesajı gösterilir;
+  (b) oturumda zaten bulunan katılımcılar YENİ GÖRÜŞ GİREMEZ; (c) mevcut
+  katılımcılar OY VEREMEZ. Bu kontrol, mevcut oturum erişim middleware'ine
+  (madde 4b, visibility/password kontrolüyle AYNI katmana) eklenir — yeni
+  bir mekanizma icat edilmez. Zaten bağlı olan (canlı socket bağlantısı
+  açık) katılımcılar için de bu kısıtlama ANINDA devreye girmeli (madde
+  10'daki "her emit'te yeniden doğrulama" mantığıyla tutarlı — durum
+  değişince eski bağlantı da yeni kurala tabi olmalı).
+
+## 22. LLM Sızıntısı Kalıcı Değil — Doğrulanmış Kanıt Zorunlu (Madde 20 Yetersiz Kaldı)
+
+- **Kutuplaşma etkisi HER ZAMAN %0.0 çıkıyor (ekran görüntüsüyle
+  doğrulandı):** Bu, LLM sızıntısından AYRI, öncelikli bir bug. Önce
+  leave-one-out hesaplama fonksiyonunun (madde 17) gerçek çıktısını,
+  HİÇBİR LLM/prompt katmanına dokunmadan, ham sayısal değer olarak
+  (console.log ile) doğrula. Eğer ham değer de 0 ise, hesaplama
+  fonksiyonunun kendisi bozuk. Eğer ham değer doğruysa (0 değilse), sorun
+  bu değerin prompt'a aktarılması sırasında bir yerde kaybolması/
+  sıfırlanmasıdır — değişkenin fonksiyonlar arası aktarımını satır satır izle.
+- **Madde 20'deki `sanitizeLLMResponse` fonksiyonu TAM olarak
+  doğrulanmamış:** Görsel kanıt, sızıntının eksen etiketleme ve kutuplaşma
+  etkisi çağrılarında HÂLÂ devam ettiğini gösteriyor. Bir önceki görevde
+  "düzeltildi" denmiş olması, gerçekten düzeldiği anlamına gelmiyor — bu
+  görevde, her çağrı noktası için gerçek (mock olmayan) bir LLM çağrısı
+  yapılıp, çıktının sızıntı İÇERMEDİĞİ tek tek KANITLANMALI (ekran
+  görüntüsü veya log çıktısıyla), sadece "sanitizeLLMResponse eklendi"
+  demek yeterli sayılmaz.
+- **Yönetici özeti — "hangi kısım gösteriliyor" hatası:** Model doğru bir
+  nihai metin üretiyor ama kod, ara adımları (draft/taslak aşaması) da
+  dahil ederek gösteriyor. Bu ÖZEL olarak: prompt, modelin TEK bir nihai
+  cevap üretmesini (ara adım YAZDIRMADAN) sağlayacak şekilde
+  YENİDEN yazılmalı — "önce taslak, sonra profesyonel hali" gibi çok
+  adımlı bir yapı prompt'ta VARSA bu kaldırılmalı, tek adımlı direkt
+  talimata çevrilmeli (madde 20'nin zaten önerdiği yöntem, ama yönetici
+  özeti çağrı noktasına HİÇ uygulanmamış görünüyor).
+
+## 23. #3 ve #6 İçin Sınırlayıcı Etiket Çıkarma + Retry Mantığı (Yol C + Yol D)
+
+- **Kapsam:** SADECE `generateAxisLabel` (#3) ve `generateExecutiveSummary`
+  (#6) için uygulanır. Zaten çalışan 4 nokta (küme özeti, moderasyon,
+  kutuplaşma etkisi, uzlaşı keşfi) DEĞİŞTİRİLMEZ.
+- **Sınırlayıcı etiket çıkarma:** Bu iki çağrı noktasının sistem promptuna,
+  modelin cevabını `[CEVAP]...[/CEVAP]` etiketleri arasına koyması talimatı
+  eklenir. Yanıt alındığında, önce bu etiketler arasındaki içerik regex ile
+  çıkarılmaya çalışılır — modelin etiket ÖNCESİNDE/SONRASINDA ne kadar
+  "düşünme" metni üretirse üretsin, SADECE etiket içi alınır.
+- **Çıkarılan içerik de doğrulanır:** Etiket içinden çıkarılan metin, yine
+  de madde 20'deki meta-talimat sızıntı deseni kontrolünden geçirilir
+  (ikinci bir güvenlik katmanı) — etiket içi de sızıntı içeriyorsa geçersiz
+  sayılır.
+- **Retry mantığı:** Etiket bulunamazsa VEYA çıkarılan içerik de geçersizse,
+  aynı çağrı KISA bir gecikmeyle en fazla 2 KEZ DAHA denenir (toplam 3
+  deneme). Üç deneme de başarısız olursa, mevcut dinamik fallback şablonuna
+  düşülür (fallback KALDIRILMAZ, son çare olarak korunur).
+- **Kanıt zorunluluğu (değişmedi):** Düzeltme sonrası #3 ve #6 için 5'er
+  kez daha canlı test yapılıp, kaçının (a) ilk denemede etiketle temiz
+  çıktı verdiği, (b) retry sonrası temiz çıktı verdiği, (c) yine de
+  fallback'e düştüğü ayrı ayrı raporlanır — "çalışıyor" demek yetmez,
+  oran verilmeli.

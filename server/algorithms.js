@@ -544,10 +544,20 @@ export function calculatePolarisability(points, camps) {
   }
 
   // 4. Kutuplaşma derecesini hesapla: (KamplarArasıVaryans / ToplamVaryans) * 100
-  let polarisability = (betweenCampVariance / totalVariance) * 100;
+  const polarisabilityRaw = (betweenCampVariance / totalVariance) * 100;
+
+  // 5. Güvenlik kancası: ANOVA garantisi geçerliyse [0,100] aralığında olmalı.
+  //    Floating point hatası veya koordinat uzayı tutarsızlığı nedeniyle
+  //    bu aralık dışına çıkarsa null döndür (eksik varyans olarak işaretle).
+  if (polarisabilityRaw < 0 || polarisabilityRaw > 100.5) {
+    console.warn(`[calculatePolarisability] Geçersiz değer: ${polarisabilityRaw.toFixed(2)}% — koordinat uzayı tutarsızlığı olabilir. null döndürülüyor.`);
+    return { polarisability: null, insufficientVariance: true };
+  }
+
+  const polarisability = Math.min(100, Math.max(0, polarisabilityRaw));
 
   return {
-    polarisability: Math.round(polarisability),
+    polarisability: parseFloat(polarisability.toFixed(2)),
     insufficientVariance: false
   };
 }

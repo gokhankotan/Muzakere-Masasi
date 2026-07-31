@@ -263,8 +263,10 @@ async function seedOpenData() {
           x: parseFloat(c[0].toFixed(2)),
           y: parseFloat(c[1].toFixed(2)),
           topStatements: (campAnalysis.campCharacteristics[cIdx] || []).map(ch => ({
-            statement: { id: ch.statement.id, text: ch.statement.text },
-            approvalRate: Math.round(ch.approvalRate * 100)
+            id: ch.statement.id,
+            text: ch.statement.text,
+            approvalRate: Math.round(ch.approvalRate * 100),
+            contrastScore: parseFloat((ch.contrastScore || 0).toFixed(2))
           })),
           summary: `${name}: ${campSize} katılımcının oy uyumuyla oluşan fikir kümesi.`
         };

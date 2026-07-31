@@ -267,6 +267,10 @@ app.post('/api/sessions/:code/join', passwordRateLimiter, async (req, res) => {
       return res.status(403).json({ success: false, message: 'Bu oturum artık aktif değil.' });
     }
 
+    if (session.status === 'paused') {
+      return res.status(403).json({ success: false, message: 'Bu oturum duraklatıldı.', sessionPaused: true });
+    }
+
     if (session.visibility === 'PUBLIC') {
       const accessToken = jwt.sign({ type: 'participant_access', sessionCode: upperCode }, JWT_SECRET, { expiresIn: '24h' });
       return res.json({ success: true, accessToken });
@@ -499,53 +503,60 @@ app.get('/api/sessions/:code/report', checkParticipantAccess, async (req, res) =
         const c = kmFull.centroids[cIdx] || [0, 0];
         return { id: cIdx, size, x: c[0], y: c[1] };
       });
-      const polFull = calculatePolarisability(pointsFull, campsFull);
-      const actualPolarisability = polFull.polarisability || 0;
+      // 1. Calculate actual polarization score on normalized [-80,+80] coords (same space as K-Means)
+      const pointsFullNorm = coordsFull.map((c, i) => ({ x: c[0], y: c[1], campId: kmFull.assignments[i] }));
+      const campsFullNorm = Array(k).fill(0).map((_, cIdx) => {
+        const campPts = pointsFullNorm.filter(pt => pt.campId === cIdx);
+        const size = campPts.length;
+        const meanX = size > 0 ? campPts.reduce((sum, p) => sum + p.x, 0) / size : 0;
+        const meanY = size > 0 ? campPts.reduce((sum, p) => sum + p.y, 0) / size : 0;
+        return { id: cIdx, size, x: meanX, y: meanY };
+      });
+      const polFullNorm = calculatePolarisability(pointsFullNorm, campsFullNorm);
+      const actualPolarisability = polFullNorm.polarisability !== null ? polFullNorm.polarisability : 0;
 
-      // 2. Run leave-one-out sensitivity analysis
-      const impacts = await Promise.all(statements.map(async (targetOpinion) => {
+      // 2. Run leave-one-out sensitivity analysis (all in normalized [-80,+80] space)
+      const impacts = statements.map((targetOpinion) => {
         const filteredStatements = statements.filter(st => st.id !== targetOpinion.id);
         const X_filtered = activeParticipants.map(p => filteredStatements.map(st => p.votes[st.id] !== undefined ? p.votes[st.id] : null));
         const pcaFiltered = calculatePCA(X_filtered, 2);
         const scoresFiltered = pcaFiltered.scores;
-        let minX_f = Infinity, maxX_f = -Infinity;
-        let minY_f = Infinity, maxY_f = -Infinity;
+        // Normalize filtered scores to [-80, +80]
+        let fMinX = Infinity, fMaxX = -Infinity, fMinY = Infinity, fMaxY = -Infinity;
         scoresFiltered.forEach(pt => {
-          if (pt[0] < minX_f) minX_f = pt[0];
-          if (pt[0] > maxX_f) maxX_f = pt[0];
-          if (pt[1] < minY_f) minY_f = pt[1];
-          if (pt[1] > maxY_f) maxY_f = pt[1];
+          if (pt[0] < fMinX) fMinX = pt[0];
+          if (pt[0] > fMaxX) fMaxX = pt[0];
+          if (pt[1] < fMinY) fMinY = pt[1];
+          if (pt[1] > fMaxY) fMaxY = pt[1];
         });
-        const rangeX_f = maxX_f - minX_f;
-        const rangeY_f = maxY_f - minY_f;
-        const coordsFiltered = activeParticipants.map((p, i) => {
-          let xCoord = 0;
-          let yCoord = 0;
-          if (rangeX_f > 1e-5) xCoord = ((scoresFiltered[i][0] - minX_f) / rangeX_f) * 160 - 80;
-          if (rangeY_f > 1e-5) yCoord = ((scoresFiltered[i][1] - minY_f) / rangeY_f) * 160 - 80;
-          return [xCoord, yCoord];
+        const fRangeX = fMaxX - fMinX;
+        const fRangeY = fMaxY - fMinY;
+        const coordsFiltered = scoresFiltered.map(pt => {
+          const x = fRangeX > 1e-5 ? ((pt[0] - fMinX) / fRangeX) * 160 - 80 : 0;
+          const y = fRangeY > 1e-5 ? ((pt[1] - fMinY) / fRangeY) * 160 - 80 : 0;
+          return [x, y];
         });
-        
         const kmFiltered = runKMeansWithStability(coordsFiltered, k, 5);
-        const pointsFiltered = coordsFiltered.map((c, i) => ({ x: c[0], y: c[1], campId: kmFiltered.assignments[i] }));
+        const ptsFiltered = coordsFiltered.map((c, i) => ({ x: c[0], y: c[1], campId: kmFiltered.assignments[i] }));
         const campsFiltered = Array(k).fill(0).map((_, cIdx) => {
-          const size = pointsFiltered.filter(pt => pt.campId === cIdx).length;
-          const c = kmFiltered.centroids[cIdx] || [0, 0];
-          return { id: cIdx, size, x: c[0], y: c[1] };
+          const campPts = ptsFiltered.filter(pt => pt.campId === cIdx);
+          const size = campPts.length;
+          const meanX = size > 0 ? campPts.reduce((sum, p) => sum + p.x, 0) / size : 0;
+          const meanY = size > 0 ? campPts.reduce((sum, p) => sum + p.y, 0) / size : 0;
+          return { id: cIdx, size, x: meanX, y: meanY };
         });
-        const polFiltered = calculatePolarisability(pointsFiltered, campsFiltered);
-        const polarisabilityWithoutOpinion = polFiltered.polarisability || 0;
+        const polFiltered = calculatePolarisability(ptsFiltered, campsFiltered);
+        const polarisabilityWithoutOpinion = polFiltered.polarisability !== null ? polFiltered.polarisability : 0;
         
         const impact = actualPolarisability - polarisabilityWithoutOpinion;
-        
-        const description = await generatePolarizationImpactDescription(impact);
+        const description = generatePolarizationImpactDescription(impact);
         
         return {
           opinionContent: targetOpinion.text,
           polarizationImpact: parseFloat(impact.toFixed(1)),
           description
         };
-      }));
+      });
 
       // Sort by polarizationImpact descending, take top 5
       polarizationImpacts = impacts.sort((a, b) => b.polarizationImpact - a.polarizationImpact).slice(0, 5);
@@ -753,16 +764,13 @@ async function performAnalysis(sessionCode) {
   let axisLabelY = '';
 
   const prevAxisLabels = session.analysis?.axisLabels || {};
-  const isXClean = prevAxisLabels.x && !prevAxisLabels.x.includes('Thinking Process') && !prevAxisLabels.x.includes('<think>');
-  const isYClean = prevAxisLabels.y && !prevAxisLabels.y.includes('Thinking Process') && !prevAxisLabels.y.includes('<think>');
-
-  if (process.env.DISABLE_LLM_CACHE !== 'true' && prevAxisLabels.signatureX === signatureX && isXClean) {
+  if (process.env.DISABLE_LLM_CACHE !== 'true' && prevAxisLabels.signatureX === signatureX && prevAxisLabels.x) {
     axisLabelX = prevAxisLabels.x;
   } else {
     axisLabelX = await generateAxisLabel('x', top3X);
   }
 
-  if (process.env.DISABLE_LLM_CACHE !== 'true' && prevAxisLabels.signatureY === signatureY && isYClean) {
+  if (process.env.DISABLE_LLM_CACHE !== 'true' && prevAxisLabels.signatureY === signatureY && prevAxisLabels.y) {
     axisLabelY = prevAxisLabels.y;
   } else {
     axisLabelY = await generateAxisLabel('y', top3Y);
@@ -852,13 +860,7 @@ async function performAnalysis(sessionCode) {
 
     let summary = '';
     const prevCamp = session.analysis?.camps?.find(c => c.id === cIdx);
-    const isSummaryClean = prevCamp?.summary && 
-      !prevCamp.summary.includes('Thinking Process') && 
-      !prevCamp.summary.includes('<think>') && 
-      !prevCamp.summary.toLowerCase().includes('concussion') && 
-      !prevCamp.summary.toLowerCase().includes('nfl');
-
-    if (process.env.DISABLE_LLM_CACHE !== 'true' && prevCamp && prevCamp.signature === signature && isSummaryClean) {
+    if (process.env.DISABLE_LLM_CACHE !== 'true' && prevCamp && prevCamp.signature === signature && prevCamp.summary) {
       summary = prevCamp.summary;
     } else {
       summary = await generateClusterSummary(cIdx, topStatements);
@@ -1140,6 +1142,9 @@ io.on('connection', (socket) => {
       const session = db.getSessionSync(code);
       if (session && session.status === 'archived') {
         return callback({ success: false, message: 'Bu oturum artık aktif değil.' });
+      }
+      if (session && session.status === 'paused') {
+        return callback({ success: false, message: 'Bu oturum duraklatıldı.', sessionPaused: true });
       }
 
       const participant = db.addParticipant(code, nickname, justification);

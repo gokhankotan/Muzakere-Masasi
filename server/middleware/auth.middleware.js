@@ -93,6 +93,11 @@ export async function checkParticipantAccess(req, res, next) {
     return res.status(404).json({ success: false, message: 'Oturum bulunamadı.' });
   }
 
+  // Oturum duraklatılmışsa erişimi engelle
+  if (session.status === 'paused') {
+    return res.status(403).json({ success: false, message: 'Bu oturum duraklatılmıştır.', sessionPaused: true });
+  }
+
   // Oturum PUBLIC ise doğrudan geçişe izin ver
   if (session.visibility === 'PUBLIC') {
     return next();

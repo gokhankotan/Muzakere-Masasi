@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Matematiksel / Algoritmik Dogruluk Test Paketi
  * Calistirmak icin: npm test
  */
@@ -124,6 +124,20 @@ describe("calculatePolarisability", () => {
     const camps = [{id:0,x:0,y:0.5,size:4}];
     const { polarisability } = calculatePolarisability(pts, camps);
     expect(polarisability).toBeLessThan(20);
+  });
+
+  it("leave-one-out hassasiyet farki 0'dan farkli hassas float doner", () => {
+    const ptsFull = [{x:-50,y:0},{x:-52,y:1},{x:-48,y:-1},{x:50,y:0},{x:52,y:1},{x:48,y:-1}];
+    const campsFull = [{id:0,x:-50,y:0,size:3},{id:1,x:50,y:0,size:3}];
+    const polFull = calculatePolarisability(ptsFull, campsFull).polarisability;
+
+    // Bir kump noktasini cikardigimizda polarizasyon degisimi
+    const ptsFiltered = [{x:-50,y:0},{x:-52,y:1},{x:50,y:0},{x:52,y:1},{x:48,y:-1}];
+    const campsFiltered = [{id:0,x:-51,y:0.5,size:2},{id:1,x:50,y:0,size:3}];
+    const polFiltered = calculatePolarisability(ptsFiltered, campsFiltered).polarisability;
+
+    const diff = parseFloat((polFull - polFiltered).toFixed(2));
+    expect(diff).not.toBe(0);
   });
 });
 
