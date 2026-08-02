@@ -105,21 +105,18 @@ Bu doküman, Müzakere Masası projesinin başlangıçtan itibaren geçirmiş ol
 
 ---
 
-## ⚡ Aşama 7: LLM API Kullanımı ve Kota Optimizasyonu (Son Aşama)
+## ⚡ Aşama 7: Olay Odaklı LLM Önbellek İptali ve Veritabanı Kalıcılığı (Son Aşama)
 
-- [x] **1. In-Memory Result Caching (`server/services/llm.service.js`)**
-  - SHA256 veri özeti tabanlı `llmCache` önbellek katmanı. Aynı veri için LLM API çağrısı atlanarak milisaniyeler içinde cached yanıt verilir (`⚡ [LLM CACHE HIT]`).
-- [x] **2. Batched Cluster Summary Requests (`generateAllClusterSummaries`)**
-  - Oturumdaki N adet küme özeti tek bir batched JSON API çağrısıyla alınarak N çağrı 1'e indirgendi (`🌐 [LLM BATCH CALL]`).
-- [x] **3. Frontend & Backend Button Spam Protection**
-  - `AdminDashboard.jsx` üzerinde `useRef` 1000ms debounce koruması ve yükleniyor kilidi.
-  - `server/index.js` üzerinde `inFlightConsensusLocks` ile aynı oturuma gelen eşzamanlı isteklerin birleştirilmesi (`🔒 [LLM IN-FLIGHT DEDUP]`).
-- [x] **4. Exponential Backoff & Retry Cap (`executeLlmWithRetry`)**
-  - 1s, 2s üstel bekleme ve maks 2 retry limiti. Cap dolduğunda anında kural tabanlı fallback engine çalışır.
-- [x] **5. Model Name & 404/401 Error Validation**
-  - Model konfigürasyonu açılışta loglanır. 404 (NotFound) veya 401 (Unauthorized) hatalarında deneme harcamadan anında fallback'e geçilir.
-- [x] **6. Idempotent Seed Import (`server/seed_open_data.js`)**
-  - Önceden seed edilmiş oturumların saklanan LLM içerikleri veritabanından okunur, seed sırasında 0 LLM API çağrısı yapılır (`⚡ [SEED IDEMPOTENT]`).
+- [x] **1. Oturum Mutation & Version Takibi (`markSessionMutated`)**
+  - Yeni görüş ekleme, görüş onaylama/reddetme, oy verme, soru değiştirme ve kamp ayarı değiştirme işlemlerinde `sessionVersion` artırılır.
+- [x] **2. Önbellek Anahtarının Oturum Sürümüne Bağlanması (`consensus-discovery:CODE:vVersion`)**
+  - Değişiklik yoksa `⚡ [LLM CACHE HIT — NO SESSION CHANGES]` verilerek 0 token harcanır.
+- [x] **3. Değişiklik Anında Doğrudan Önbellek İptali (`invalidateLlmCacheForSession`)**
+  - Mutation anında ilgili oturumun eski LLM önbellek kayıtları silinir.
+- [x] **4. Yönetici Paneline Veri Tazeliği Göstergesi (`AdminDashboard.jsx`)**
+  - `🟢 Veri Güncel (Önbellekten — 0 Token)` veya `🟠 Yeni veri mevcut — Analiz güncellenebilir` rozeti.
+- [x] **5. Sunucu Restart Sonrası Veritabanı Önbellek Kalıcılığı (`loadSessionsFromDB`)**
+  - Veritabanındaki `session.analysis` nesnesinden önbellek geri yüklenerek restart sonrası 0 token harcanır.
 
 ---
 
@@ -130,7 +127,6 @@ Bu doküman, Müzakere Masası projesinin başlangıçtan itibaren geçirmiş ol
 | Vitest PCA | PCA matris indirgeme birim testi (`polarisability.test.js`) | ✅ BAŞARILI |
 | Vitest K-Means | K-Means kümeleme birim testi (`math-correctness.test.js`) | ✅ BAŞARILI |
 | Vitest Köprü Cümle | Köprü Cümle kuralı doğrulama birim testi (`analysis.test.js`) | ✅ BAŞARILI |
-| Idempotent Seed | Saklanan LLM içeriklerini kullanıp 0 API çağrısı yapma | ✅ BAŞARILI |
-| LLM Result Cache | Değişmeyen verilerde önbellekten anında yanıt dönme | ✅ BAŞARILI |
-| Batched Summaries | N küme özetini 1 API isteğinde topluca üretme | ✅ BAŞARILI |
+| Event-Driven Invalidation | Değişiklik anında eski önbelleği temizleme | ✅ BAŞARILI |
+| DB Cache Persistence | Sunucu restart sonrası veritabanından önbellek yükleme | ✅ BAŞARILI |
 | Arayüz Derlemesi | `npx vite build` ile 0 hatasız üretim derlemesi alabilme | ✅ BAŞARILI |

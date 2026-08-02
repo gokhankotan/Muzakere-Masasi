@@ -37,6 +37,7 @@ export default function AdminDashboard({
   const [consensusResult, setConsensusResult] = useState('');
   const [consensusError, setConsensusError] = useState('');
   const [discoveringConsensus, setDiscoveringConsensus] = useState(false);
+  const [dataFreshness, setDataFreshness] = useState(null); // { isFresh: boolean, version: number }
   const lastConsensusClickRef = React.useRef(0);
 
   const fetchActionLogs = () => {
@@ -60,6 +61,7 @@ export default function AdminDashboard({
     // Oturum değiştiğinde uzlaşı keşif panelini sıfırla
     setConsensusResult('');
     setConsensusError('');
+    setDataFreshness(null);
     return () => clearInterval(interval);
   }, [activeSessionCode]);
 
@@ -119,18 +121,46 @@ export default function AdminDashboard({
           question: editQuestion,
           status: editStatus,
           visibility: editVisibility,
-          password: editVisibility === 'PASSWORD_PROTECTED' ? editPassword : ''
+          password: editPassword
         })
       });
       const data = await res.json();
-      if (!res.ok) {
-        return setEditError(data.message || (lang === 'tr' ? 'Güncelleme hatası.' : 'Update failed.'));
+      if (data.success) {
+        setEditSuccess(lang === 'tr' ? 'Oturum bilgileri başarıyla güncellendi!' : 'Session updated successfully!');
+        if (onUpdateQuestion && editingSession.code === activeSessionCode) {
+          onUpdateQuestion(editQuestion);
+        }
+      } else {
+        setEditError(data.message || (lang === 'tr' ? 'Güncelleme başarısız.' : 'Update failed.'));
       }
-      setEditSuccess(lang === 'tr' ? '✅ Oturum başarıyla güncellendi!' : '✅ Session updated successfully!');
-      // Formu kapatma; güncelleme mesajını göster, kullanıcı isterse kapat
-    } catch {
+    } catch (err) {
       setEditError(lang === 'tr' ? 'Bağlantı hatası oluştu.' : 'Connection error.');
     }
+  };
+
+  const handleUpdateQuestion = (e) => {
+    e.preventDefault();
+    if (onUpdateQuestion) {
+      onUpdateQuestion(newQuestion);
+      alert(lang === 'tr' ? 'Müzakere sorusu başarıyla güncellendi!' : 'Question updated successfully!');
+    }
+  };
+
+  const handleRunSimulation = (count) => {
+    setSimStatus(lang === 'tr' ? `${count} bot simülasyonu başlatılıyor...` : `Starting ${count} bot simulation...`);
+    onRunSimulation(count);
+    setTimeout(() => {
+      setSimStatus(lang === 'tr' ? `✅ ${count} bot başarıyla eklendi ve oylama tamamlandı!` : `✅ ${count} bots successfully added!`);
+    }, 2000);
+  };
+
+  const handleResetSession = () => {
+    if (!resetConfirm) {
+      setResetConfirm(true);
+      return;
+    }
+    onResetSession();
+    setResetConfirm(false);
   };
 
   const handleSaveCampName = (campId) => {
@@ -140,34 +170,18 @@ export default function AdminDashboard({
     setEditingCampName('');
   };
 
-  const handleUpdateQuestion = (e) => {
-    e.preventDefault();
-    if (!newQuestion.trim()) return;
-    onUpdateQuestion(newQuestion.trim());
-    alert('Müzakere sorusu başarıyla güncellendi.');
-  };
-
-  const handleRunSimulation = (count) => {
-    setSimStatus('Simülasyon çalıştırılıyor...');
-    onRunSimulation(count, (res) => {
-      if (res.success) {
-        setSimStatus(`${count} yapay katılımcı ve oyları başarıyla eklendi! Kümeleme güncellendi.`);
-        setTimeout(() => setSimStatus(''), 5000);
-      } else {
-        setSimStatus(`Simülasyon hatası: ${res.message}`);
-      }
-    });
-  };
-
-  const handleResetSession = () => {
-    if (!resetConfirm) {
-      setResetConfirm(true);
+  const handleResetAllData = () => {
+    if (!confirm('TÜM veritabanını sıfırlamak ve varsayılan test verilerine dönmek istediğinize emin misiniz? Bu işlem geri alınamaz!')) {
       return;
     }
-    onResetSession((res) => {
+    const token = localStorage.getItem('admin_token');
+    fetch('/api/admin/reset-database', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+    .then(res => res.json())
+    .then(res => {
       if (res.success) {
-        setResetConfirm(false);
-        setNewQuestion('');
         alert('Tüm oturum verileri sıfırlandı ve varsayılan görüşler yüklendi.');
       } else {
         alert(`Sıfırlama hatası: ${res.message}`);
@@ -201,6 +215,9 @@ export default function AdminDashboard({
       const data = await res.json();
       if (data.success) {
         setConsensusResult(data.consensusPotential);
+        if (data.dataFreshness) {
+          setDataFreshness(data.dataFreshness);
+        }
       } else {
         setConsensusError(data.message || (lang === 'tr' ? 'Uzlaşı potansiyeli keşfedilemedi.' : 'Failed to discover consensus.'));
       }
@@ -504,6 +521,23 @@ export default function AdminDashboard({
             </div>
           )}
           
+          {/* Data Freshness Indicator (Requirement 4) */}
+          {dataFreshness && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.78rem', marginBottom: '0.25rem' }}>
+              {dataFreshness.isFresh ? (
+                <span style={{ background: 'rgba(34, 197, 94, 0.1)', color: '#22c55e', border: '1px solid rgba(34, 197, 94, 0.25)', padding: '0.25rem 0.65rem', borderRadius: '12px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <span>🟢</span>
+                  <span>{lang === 'tr' ? 'Veri Güncel (Önbellekten — 0 Token)' : 'Data Up to Date (Cached — 0 Tokens)'}</span>
+                </span>
+              ) : (
+                <span style={{ background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', border: '1px solid rgba(245, 158, 11, 0.25)', padding: '0.25rem 0.65rem', borderRadius: '12px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <span>🟠</span>
+                  <span>{lang === 'tr' ? 'Yeni veri mevcut — Analiz güncellenebilir' : 'New activity present — Analysis can be updated'}</span>
+                </span>
+              )}
+            </div>
+          )}
+
           <button 
             onClick={handleDiscoverConsensus} 
             className="btn btn-secondary"

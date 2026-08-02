@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
+import { invalidateLlmCacheForSession, setInLlmCache, generateHash } from './services/llm.service.js';
 
 class Database {
   constructor() {
@@ -8,8 +9,40 @@ class Database {
     this.sessions = new Map(); // code -> session object
     this.admins = new Map();   // email -> admin object (In-Memory admin deposu)
     this.adminActions = [];    // Yöneticilerin son değişiklikleri günlüğü
+    this.sessionVersions = new Map();     // code -> mutation version number (Req 1)
+    this.sessionLastMutated = new Map();  // code -> timestamp ms (Req 1)
     this.nextStatementId = 1;
     this.initialized = this.init();
+  }
+
+  markSessionMutated(sessionCode) {
+    if (!sessionCode) return { version: 1, lastMutatedAt: Date.now() };
+    const code = sessionCode.toUpperCase();
+    const currentVersion = (this.sessionVersions.get(code) || 1) + 1;
+    const now = Date.now();
+    this.sessionVersions.set(code, currentVersion);
+    this.sessionLastMutated.set(code, now);
+
+    const session = this.sessions.get(code);
+    if (session) {
+      session.version = currentVersion;
+      session.lastMutatedAt = now;
+    }
+
+    // Explicitly invalidate LLM cache for mutated session (Req 3)
+    invalidateLlmCacheForSession(code);
+
+    console.log(`🔄 [SESSION MUTATED] Session ${code} -> Version: v${currentVersion}, MutatedAt: ${new Date(now).toLocaleTimeString()}`);
+    return { version: currentVersion, lastMutatedAt: now };
+  }
+
+  getSessionMutationInfo(sessionCode) {
+    const code = (sessionCode || 'DEFAULT').toUpperCase();
+    const session = this.sessions.get(code);
+    return {
+      version: this.sessionVersions.get(code) || (session ? session.version : 1) || 1,
+      lastMutatedAt: this.sessionLastMutated.get(code) || (session ? session.lastMutatedAt : Date.now()) || Date.now()
+    };
   }
 
   logAdminAction(code, action, details, adminName = 'Yönetici') {
@@ -501,6 +534,7 @@ class Database {
     if (![1, -1, 0].includes(voteValue)) return false;
 
     participant.votes[statementId] = voteValue;
+    this.markSessionMutated(sessionCode);
 
     if (this.isPrismaActive) {
       this.prisma.vote.upsert({
@@ -544,6 +578,7 @@ class Database {
     } else {
       session.moderationQueue.push(statement);
     }
+    this.markSessionMutated(sessionCode);
 
     if (this.isPrismaActive) {
       this.prisma.opinion.create({
@@ -575,6 +610,7 @@ class Database {
       statement.approved = true;
       this.logAdminAction(sessionCode, 'APPROVE_OPINION', `Görüş onaylandı: "${statement.text.substring(0, 30)}..."`);
       session.statements.push(statement);
+      this.markSessionMutated(sessionCode);
 
       if (this.isPrismaActive) {
         this.prisma.opinion.update({
@@ -598,6 +634,7 @@ class Database {
       const statement = session.moderationQueue.splice(idx, 1)[0];
       statement.approved = false;
       this.logAdminAction(sessionCode, 'REJECT_OPINION', `Görüş reddedildi: "${statement.text.substring(0, 30)}..."`);
+      this.markSessionMutated(sessionCode);
 
       if (this.isPrismaActive) {
         this.prisma.opinion.update({
@@ -618,6 +655,7 @@ class Database {
 
     session.question = newQuestion;
     this.logAdminAction(sessionCode, 'UPDATE_QUESTION', `Soru güncellendi: ${newQuestion}`);
+    this.markSessionMutated(sessionCode);
 
     if (this.isPrismaActive) {
       this.prisma.session.update({
@@ -964,6 +1002,7 @@ class Database {
 
     session.targetK = targetK;
     this.logAdminAction(sessionCode, 'UPDATE_CAMPS_COUNT', `Hedef kamp sayısı değiştirildi: ${targetK}`);
+    this.markSessionMutated(sessionCode);
 
     if (this.isPrismaActive) {
       this.prisma.session.update({
@@ -986,6 +1025,7 @@ class Database {
     }
     session.customCampNames[campId] = newName.trim();
     this.logAdminAction(sessionCode, 'RENAME_CAMP', `Fikir kampı [${campId}] yeniden adlandırıldı: "${newName.trim()}"`);
+    this.markSessionMutated(sessionCode);
 
     if (this.isPrismaActive) {
       this.prisma.session.update({

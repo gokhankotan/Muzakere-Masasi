@@ -41,20 +41,20 @@ if (apiKey) {
 }
 
 // ==========================================
-// 1. IN-MEMORY RESULT CACHING LAYER (Req 1)
+// 1. IN-MEMORY RESULT CACHING LAYER (Req 1 & Req 2)
 // ==========================================
 const llmCache = new Map();
-const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 Saatlik varsayılan önbellek süresi
+const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000; // Mutation tabanlı sıfırlama olduğu için uzun saklama
 
-function generateHash(data) {
+export function generateHash(data) {
   return crypto.createHash('sha256').update(typeof data === 'string' ? data : JSON.stringify(data)).digest('hex');
 }
 
-export function getFromLlmCache(key, hash) {
+export function getFromLlmCache(key, hash, sessionCode = '', version = 1) {
   const cached = llmCache.get(key);
   if (cached) {
     if (Date.now() - cached.timestamp < CACHE_TTL_MS && cached.hash === hash) {
-      console.log(`⚡ [LLM CACHE HIT] Served from cache for key: ${key}`);
+      console.log(`⚡ [LLM CACHE HIT — NO SESSION CHANGES] Session ${sessionCode || key} (v${version}) unchanged since last analysis, serving cached result, 0 tokens used.`);
       return cached.result;
     }
   }
@@ -68,14 +68,27 @@ export function setInLlmCache(key, hash, result) {
   }
 }
 
-export function invalidateLlmCache(key) {
-  if (key) {
-    llmCache.delete(key);
-    console.log(`🧹 [LLM CACHE INVALIDATED] Removed cache for key: ${key}`);
-  } else {
-    llmCache.clear();
-    console.log(`🧹 [LLM CACHE CLEARED] Removed all LLM cache entries`);
+/**
+ * Oturumda yeni oy, görüş veya soru değiştiğinde tüm önbellek kaydını temizler (Req 3)
+ */
+export function invalidateLlmCacheForSession(sessionCode) {
+  if (!sessionCode) return;
+  const prefix = sessionCode.toUpperCase();
+  let count = 0;
+  for (const key of llmCache.keys()) {
+    if (key.includes(`:${prefix}`) || key.endsWith(`:${prefix}`)) {
+      llmCache.delete(key);
+      count++;
+    }
   }
+  if (count > 0) {
+    console.log(`🧹 [LLM CACHE INVALIDATED] Removed ${count} cached entries for mutated session: ${prefix}`);
+  }
+}
+
+export function clearAllLlmCache() {
+  llmCache.clear();
+  console.log(`🧹 [LLM CACHE CLEARED] Removed all LLM cache entries`);
 }
 
 // =======================================================
@@ -100,12 +113,11 @@ async function executeLlmWithRetry(requestParams, callType, maxRetries = 2) {
       const status = err.status || err.statusCode || (err.response && err.response.status);
       const message = err.message || '';
 
-      // Requirement 5: Model 404 / 401 Sanity & Non-retryable error detection
       const is404 = status === 404 || message.includes('404') || message.toLowerCase().includes('not found');
       const is401 = status === 401 || message.includes('401') || message.toLowerCase().includes('unauthorized');
 
       if (is404) {
-        console.error(`❌ [LLM 404 NOT FOUND ERROR] Model '${modelName}' or endpoint '${baseURL || 'default'}' returned 404 Not Found. Please check LLM_MODEL_NAME and LLM_BASE_URL. Non-retryable error. Falling back immediately.`);
+        console.error(`❌ [LLM 404 NOT FOUND ERROR] Model '${modelName}' or endpoint '${baseURL || 'default'}' returned 404 Not Found. Non-retryable error. Falling back immediately.`);
         return null;
       }
       if (is401) {
@@ -127,10 +139,6 @@ async function executeLlmWithRetry(requestParams, callType, maxRetries = 2) {
   return null;
 }
 
-/**
- * Qwen/DeepSeek gibi "düşünen" modellerin yanıtından <think>...</think>
- * bloklarını, 'Thinking Process:' metinlerini ve numaralandırılmış analiz adımlarını temizler.
- */
 function cleanLLMOutput(text) {
   if (!text) return '';
   let cleaned = text
@@ -138,7 +146,6 @@ function cleanLLMOutput(text) {
     .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
     .trim();
 
-  // Düşünme adımlarını/bloklarını temizle
   if (/^(Thinking Process:|1\.\s+\*\*|\*\*Thinking|\*\*Analyze|\d+\.\s+\*\*|\*\s+\*\*)/i.test(cleaned) || cleaned.includes('Thinking Process:')) {
     const codeBlockMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
     if (codeBlockMatch && codeBlockMatch[1]) {
@@ -176,9 +183,6 @@ function cleanLLMOutput(text) {
     .trim();
 }
 
-/**
- * Metin içerisinden [CEVAP]...[/CEVAP] etiketleri arasındaki içeriği çıkarır.
- */
 export function extractDelimited(rawText) {
   if (!rawText || typeof rawText !== 'string') return null;
   const match = rawText.match(/\[CEVAP\]([\s\S]*?)\[\/CEVAP\]/i);
@@ -189,9 +193,6 @@ export function extractDelimited(rawText) {
   return null;
 }
 
-/**
- * Tüm LLM yanıtlarını doğrulayan ve meta-talimat sızıntılarını engelleyen merkezi doğrulayıcı.
- */
 export function sanitizeLLMResponse(rawText, callType) {
   if (!rawText || typeof rawText !== 'string' || rawText.trim().length === 0) {
     return null;
@@ -243,9 +244,6 @@ export function sanitizeLLMResponse(rawText, callType) {
   return cleaned;
 }
 
-/**
- * Kural tabanlı (rule-based) yedek özetleyici.
- */
 function generateFallbackSummary(campId, topStatements) {
   if (!topStatements || topStatements.length === 0) {
     return `Grup ${String.fromCharCode(65 + campId)}: Henüz fikir örüntüsü netleşmemiş katılımcılar.`;
@@ -265,9 +263,9 @@ function generateFallbackSummary(campId, topStatements) {
 }
 
 // ========================================================
-// 3. BATCHED CLUSTER SUMMARY GENERATION (Req 2 & Req 1 Cache)
+// 3. BATCHED CLUSTER SUMMARY GENERATION (Version-Tied Cache)
 // ========================================================
-export async function generateAllClusterSummaries(camps, question = '', sessionCode = 'DEFAULT') {
+export async function generateAllClusterSummaries(camps, question = '', sessionCode = 'DEFAULT', version = 1) {
   if (!camps || camps.length === 0) return {};
 
   const campHashData = camps.map(c => ({
@@ -275,10 +273,10 @@ export async function generateAllClusterSummaries(camps, question = '', sessionC
     name: c.name,
     top: (c.topStatements || []).slice(0, 3).map(st => st.text || st.statement?.text)
   }));
-  const cacheKey = `cluster-summaries:${sessionCode}`;
-  const hash = generateHash({ question, campHashData });
+  const cacheKey = `cluster-summaries:${sessionCode}:v${version}`;
+  const hash = generateHash({ question, campHashData, version });
 
-  const cached = getCache(cacheKey, hash);
+  const cached = getFromLlmCache(cacheKey, hash, sessionCode, version);
   if (cached) return cached;
 
   if (!openaiClient || process.env.LLM_DRY_RUN === 'true') {
@@ -286,7 +284,7 @@ export async function generateAllClusterSummaries(camps, question = '', sessionC
     camps.forEach(c => {
       fallbacks[c.id] = generateFallbackSummary(c.id, c.topStatements);
     });
-    setCache(cacheKey, hash, fallbacks);
+    setInLlmCache(cacheKey, hash, fallbacks);
     return fallbacks;
   }
 
@@ -318,7 +316,7 @@ Görevin: Her bir fikir grubu için 1-2 cümlelik tarafsız Türkçe profil öze
     temperature: 0.3
   };
 
-  console.log(`🌐 [LLM BATCH CALL] Requesting all ${camps.length} cluster summaries in 1 batched API request for session ${sessionCode}...`);
+  console.log(`🌐 [LLM BATCH CALL] Requesting all ${camps.length} cluster summaries in 1 batched API request for session ${sessionCode} (v${version})...`);
   const rawResult = await executeLlmWithRetry(requestParams, 'cluster-summary');
   
   const resultMap = {};
@@ -340,40 +338,33 @@ Görevin: Her bir fikir grubu için 1-2 cümlelik tarafsız Türkçe profil öze
     }
   }
 
-  // Ensure every camp has a summary (fallback if missing)
   camps.forEach(c => {
     if (!resultMap[c.id]) {
       resultMap[c.id] = generateFallbackSummary(c.id, c.topStatements);
     }
   });
 
-  setCache(cacheKey, hash, resultMap);
+  setInLlmCache(cacheKey, hash, resultMap);
   return resultMap;
 }
 
-/**
- * Tekli Küme Özeti (Geriye Dönük Uyumluluk Wrappper)
- */
-export async function generateClusterSummary(campId, topStatements, question = '', sessionCode = 'DEFAULT') {
+export async function generateClusterSummary(campId, topStatements, question = '', sessionCode = 'DEFAULT', version = 1) {
   if (process.env.LLM_DRY_RUN === 'true') {
     logDryRunCall('cluster-summary');
     return `[DRY-RUN] Küme Özeti (Grup ${campId})`;
   }
 
-  const singleCacheKey = `single-cluster-summary:${sessionCode}:${campId}`;
-  const hash = generateHash({ question, topStatements: (topStatements || []).slice(0, 3).map(s => s.text) });
-  const cached = getCache(singleCacheKey, hash);
+  const singleCacheKey = `single-cluster-summary:${sessionCode}:${campId}:v${version}`;
+  const hash = generateHash({ question, topStatements: (topStatements || []).slice(0, 3).map(s => s.text), version });
+  const cached = getFromLlmCache(singleCacheKey, hash, sessionCode, version);
   if (cached) return cached;
 
-  const batched = await generateAllClusterSummaries([{ id: campId, topStatements }], question, sessionCode);
+  const batched = await generateAllClusterSummaries([{ id: campId, topStatements }], question, sessionCode, version);
   const result = batched[campId] || generateFallbackSummary(campId, topStatements);
-  setCache(singleCacheKey, hash, result);
+  setInLlmCache(singleCacheKey, hash, result);
   return result;
 }
 
-/**
- * Moderasyon Taraması
- */
 function evaluateOpinionFallback(text) {
   const cleanText = text.toLowerCase().trim();
   const urlPattern = /(https?:\/\/[^\s]+|www\.[^\s]+|[a-z0-9]+\.(com|net|org|edu|gov|mil|info|biz|co|io|xyz|info|tr|us|uk|de|ru|asia|online|site|app|dev))/i;
@@ -454,9 +445,6 @@ Sadece geçerli bir JSON objesi döndür.
   }
 }
 
-/**
- * Eksen Etiketi Üretimi
- */
 export async function generateAxisLabel(axisName, topStatements) {
   if (process.env.LLM_DRY_RUN === 'true') {
     logDryRunCall('axis-label');
@@ -519,7 +507,7 @@ export function generatePolarizationImpactDescription(impact) {
 }
 
 // ========================================================
-// 4. CONSENSUS DISCOVERY WITH CACHING (Req 1 & Req 4)
+// 4. CONSENSUS DISCOVERY WITH VERSION-TIED CACHE (Req 1 & Req 2)
 // ========================================================
 function generateRuleBasedConsensusFallback(camps, question) {
   if (!camps || camps.length === 0) {
@@ -540,7 +528,7 @@ function generateRuleBasedConsensusFallback(camps, question) {
   return `"${question}" konusundaki müzakerede ${camps.length} ana fikir grubu (${campNames}) arasında yapılan analiz sonucunda, temel beklentilerin ortak fayda ve yapıcı çözümler etrafında odaklandığı gözlemlenmektedir. ${opinionContext}Moderatör olarak bu ortak temada yeni bir odak sorusu açarak gruplar arası diyaloğu teşvik edebilirsiniz.`;
 }
 
-export async function discoverConsensusPotential(camps, question, sessionCode = 'DEFAULT') {
+export async function discoverConsensusPotential(camps, question, sessionCode = 'DEFAULT', version = 1) {
   if (process.env.LLM_DRY_RUN === 'true') {
     logDryRunCall('consensus-discovery');
     return `[DRY-RUN] Ortak Uzlaşı Potansiyeli Özeti ve Süreç Önerisi`;
@@ -554,16 +542,16 @@ export async function discoverConsensusPotential(camps, question, sessionCode = 
     size: c.size,
     top: (c.topStatements || []).slice(0, 3).map(s => s.text || s.statement?.text)
   }));
-  const cacheKey = `consensus-discovery:${sessionCode}`;
-  const hash = generateHash({ question, campHashData });
+  const cacheKey = `consensus-discovery:${sessionCode}:v${version}`;
+  const hash = generateHash({ question, campHashData, version });
 
-  const cached = getCache(cacheKey, hash);
+  const cached = getFromLlmCache(cacheKey, hash, sessionCode, version);
   if (cached) {
     return cached;
   }
 
   if (!openaiClient) {
-    setCache(cacheKey, hash, fallbackConsensus);
+    setInLlmCache(cacheKey, hash, fallbackConsensus);
     return fallbackConsensus;
   }
 
@@ -607,16 +595,16 @@ KESİN KURALLAR:
     requestParams.reasoning_effort = process.env.LLM_REASONING_EFFORT;
   }
 
-  console.log(`🌐 [LLM CALL] Executing live LLM consensus discovery API call for session ${sessionCode}...`);
+  console.log(`🌐 [LLM CALL] Executing live LLM consensus discovery API call for session ${sessionCode} (v${version})...`);
   const result = await executeLlmWithRetry(requestParams, 'consensus-discovery');
   const finalResult = result || fallbackConsensus;
 
-  setCache(cacheKey, hash, finalResult);
+  setInLlmCache(cacheKey, hash, finalResult);
   return finalResult;
 }
 
 // ========================================================
-// 5. EXECUTIVE SUMMARY WITH CACHING (Req 1 & Req 4)
+// 5. EXECUTIVE SUMMARY WITH VERSION-TIED CACHE (Req 1 & Req 2)
 // ========================================================
 function generateRuleBasedExecutiveSummary(data) {
   const {
@@ -641,7 +629,7 @@ ${bridgesCount > 0
   : 'Müzakere sürecinde tüm fikir gruplarının üzerinde uzlaştığı ortak bir köprü görüş henüz tespit edilememiştir.'}`;
 }
 
-export async function generateExecutiveSummary(data, sessionCode = 'DEFAULT') {
+export async function generateExecutiveSummary(data, sessionCode = 'DEFAULT', version = 1) {
   const {
     question,
     participantsCount,
@@ -657,16 +645,16 @@ export async function generateExecutiveSummary(data, sessionCode = 'DEFAULT') {
 
   const ruleBasedSummary = generateRuleBasedExecutiveSummary(data);
 
-  const cacheKey = `executive-summary:${sessionCode || 'DEFAULT'}`;
-  const hash = generateHash({ question, participantsCount, statementsCount, campsCount, polarisability, bridgesCount, bridgesText, participationGini, voteCompletionRate });
+  const cacheKey = `executive-summary:${sessionCode || 'DEFAULT'}:v${version}`;
+  const hash = generateHash({ question, participantsCount, statementsCount, campsCount, polarisability, bridgesCount, bridgesText, participationGini, voteCompletionRate, version });
 
-  const cached = getCache(cacheKey, hash);
+  const cached = getFromLlmCache(cacheKey, hash, sessionCode, version);
   if (cached) {
     return cached;
   }
 
   if (process.env.LLM_DRY_RUN === 'true' || !openaiClient) {
-    setCache(cacheKey, hash, ruleBasedSummary);
+    setInLlmCache(cacheKey, hash, ruleBasedSummary);
     return ruleBasedSummary;
   }
 
@@ -716,7 +704,7 @@ ${bridgesList}
     requestParams.reasoning_effort = process.env.LLM_REASONING_EFFORT;
   }
 
-  console.log(`🌐 [LLM CALL] Executing live LLM executive summary API call for session ${sessionCode}...`);
+  console.log(`🌐 [LLM CALL] Executing live LLM executive summary API call for session ${sessionCode} (v${version})...`);
   const rawResult = await executeLlmWithRetry(requestParams, 'executive-summary');
   let finalResult = ruleBasedSummary;
   if (rawResult) {
@@ -725,15 +713,6 @@ ${bridgesList}
     if (sanitized) finalResult = sanitized;
   }
 
-  setCache(cacheKey, hash, finalResult);
+  setInLlmCache(cacheKey, hash, finalResult);
   return finalResult;
-}
-
-// Helper aliases to maintain getCache / setCache inside function bodies
-function getCache(key, hash) {
-  return getFromLlmCache(key, hash);
-}
-
-function setCache(key, hash, result) {
-  setInLlmCache(key, hash, result);
 }

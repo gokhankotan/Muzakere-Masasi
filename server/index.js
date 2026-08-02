@@ -661,16 +661,34 @@ app.post('/api/sessions/:code/discover-consensus', requireSessionOwnership, asyn
       return res.status(400).json({ success: false, message: 'Yeterli veri veya analiz bulunmadığından uzlaşı analizi yapılamaz.' });
     }
 
+    const mutationInfo = db.getSessionMutationInfo(upperCode);
+
     // In-Flight Lock & Deduplication per session code (Requirement 3)
     if (inFlightConsensusLocks.has(upperCode)) {
       console.log(`🔒 [LLM IN-FLIGHT DEDUP] Concurrent request for session ${upperCode} detected. Joining active in-flight promise...`);
       const consensusPotential = await inFlightConsensusLocks.get(upperCode);
-      return res.json({ success: true, consensusPotential });
+      const lastAnalyzedAt = analysis.lastAnalyzedAt || Date.now();
+      return res.json({
+        success: true,
+        consensusPotential,
+        dataFreshness: {
+          isFresh: lastAnalyzedAt >= mutationInfo.lastMutatedAt,
+          version: mutationInfo.version,
+          lastAnalyzedAt,
+          lastMutatedAt: mutationInfo.lastMutatedAt
+        }
+      });
     }
 
     const consensusPromise = (async () => {
       try {
-        return await discoverConsensusPotential(analysis.camps, session.question, upperCode);
+        const result = await discoverConsensusPotential(analysis.camps, session.question, upperCode, mutationInfo.version);
+        // Persist LLM result & analysis version across server restarts (Req 5)
+        analysis.consensusPotential = result;
+        analysis.lastAnalysisVersion = mutationInfo.version;
+        analysis.lastAnalyzedAt = Date.now();
+        db.updateAnalysis(upperCode, analysis);
+        return result;
       } finally {
         inFlightConsensusLocks.delete(upperCode);
       }
@@ -679,7 +697,19 @@ app.post('/api/sessions/:code/discover-consensus', requireSessionOwnership, asyn
     inFlightConsensusLocks.set(upperCode, consensusPromise);
     const consensusPotential = await consensusPromise;
 
-    res.json({ success: true, consensusPotential });
+    const lastAnalyzedAt = analysis.lastAnalyzedAt || Date.now();
+    const isFresh = lastAnalyzedAt >= mutationInfo.lastMutatedAt;
+
+    res.json({
+      success: true,
+      consensusPotential,
+      dataFreshness: {
+        isFresh,
+        version: mutationInfo.version,
+        lastAnalyzedAt,
+        lastMutatedAt: mutationInfo.lastMutatedAt
+      }
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Şu an uzlaşı potansiyeli analiz edilemedi.' });
   }
