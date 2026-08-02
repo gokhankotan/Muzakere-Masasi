@@ -757,3 +757,40 @@ planı ve onayıyla, birbirine karışmadan uygulanmalı.
 - **Top 5 CompDemocracy OpenData:** `BG2050` (7.886), `MARCHON` (6.289), `KLIMA22` (3.142), `AMASSEM` (2.031) ve `VTAIWAN` (1.921) oturumları sisteme tohumlanmış ve test edilmiştir.
 - **Dinamik Rule-Based Uzlaşı Keşif Motoru:** LLM API limitlerinde dahi `discoverConsensusPotential` fonksiyonu `generateRuleBasedConsensusFallback(camps, question)` ile her oturumun özel sorusu ve oy örüntülerine dayalı %100 benzersiz uzlaşı analizi sunmaktadır.
 - **Oturum Senkronizasyonu:** `admin-join` olayında `session-state` ve `analysis-updated` emit edilerek admin panelinde oturum değişimlerinde anlık veri senkronizasyonu sağlanmıştır.
+
+## 29. Olay Bazlı Önbellekleme, Mutasyon Takibi ve Performans Eşikleri (Aşama 8-11 Mimarisi)
+
+- **SHA-256 Hash ve Mutasyon Sürüm Kilitli Önbellek (`getFromLlmCache` / `setInLlmCache`):** Her LLM çağrısı, oturum sürüm numarasına (`sessionVersions`) ve girdi verisinin SHA-256 hash'ine bağlanmıştır. Oturum verisi değişmediği sürece LLM çağrısı yapılmaz, 0 token harcanır.
+- **Batching Kuralı (`generateAllClusterSummaries`):** Oturumdaki tüm kirli (dirty) kamplar tek bir prompt içinde paketlenerek tek HTTP isteğinde LLM'e gönderilmelidir. Her kamp için ayrı API çağrısı YAPILAMAZ.
+- **Anlamlı Değişim Eşiği (Mutation Threshold System):** `MUTATION_THRESHOLD_VOTES` (varsayılan: 5) ve `MUTATION_THRESHOLD_OPINIONS` (varsayılan: 2) sayaçları birikmeden LLM tetiklenmez (`pendingVotes`, `pendingOpinions`).
+- **Çift Sayım Koruması:** `addStatement` onay beklerken sayacı artırmaz; sayaç sadece `approveStatement` anında +1 artırılır.
+- **Yapısal Olay Bypass'ı:** Görüş silme, K değeri değiştirme veya manuel re-analyze durumlarında eşikler bypass edilir (`forceLLM: true`).
+- **Artımlı Küme Özeti (Incremental Summaries):** Sadece katılımcı yer değişimi olan kamplar `dirtyCamps` ile işaretlenir ve LLM'e gönderilir. Değişmeyen kampların özetleri önbellekten korunur.
+
+## 30. Azınlık Görüşü Koruması & Çok Dilli Skorlama Mimarisi (Aşama 13 Kısıtları)
+
+- **Çok Dilli Gerekçe Kalite Skorlaması (`quality.service.js`):** Görüş metinlerinin rasyonellik ve gerekçelendirme kalitesi Türkçe ve İngilizce dil bağlamlarında skorlanır (`calculateReasoningQualityScore`).
+- **Minimum Oy Koruması (`MINORITY_MIN_VOTES = 3`):** Hiç oy almamış (`voteCount: 0`) görüşler, gerekçe skoru yüksek olsa dahi azınlık görüşü koruması panelinde ASLA GÖSTERİLEMEZ.
+- **Akıllı Fallback Mantığı:** Taban kalite skorunu (70) ve oy dilimini (alt %25) karşılayan görüş yoksa, en az 3 oy almış en yüksek gerekçe skoruna sahip ilk 3 görüş seçilir. Koşulu sağlayan görüş yoksa boş dizi `[]` dönülerek arayüzde bilgilendirici boş durum mesajı gösterilir.
+
+## 31. Şeffaflık Paneli & Sıkı BOLA JWT Güvenliği (Aşama 14 Kısıtları)
+
+- **Sıkı BOLA Güvenlik Zorunluluğu:** `GET /api/sessions/:code/participants/:participantId/camp-explanation` endpoint'inde `decoded.participantId === req.params.participantId` birebir eşleşmesi ZORUNLUDUR.
+- **Güvenlik İhlali İstisnalarının Kaldırılması:** `x-participant-id` header veya null-token istisnaları BOLA açığı yarattığı için kesinlikle kullanılamaz. Katılımcı A başka bir katılımcının ID'sini talep ettiğinde `403 Forbidden` verilmelidir.
+- **Token Yaşam Döngüsü:** Katılımcı rumuz belirlediğinde (`register-participant`), backend `participantId` içeren yeni bir JWT token üretir ve istemci bunu `localStorage.setItem('session_token_' + code, res.token)` üzerinde günceller.
+
+## 32. LLM RPD Kota Yönetimi ve Circuit Breaker Mimari Kısıtları (Aşama 15 Kısıtları)
+
+- **RPD / RPM Hata Ayrımı (`isRpdExhausted`):** Google Gemini API 429 RESOURCE_EXHAUSTED hatasında günlük istek limiti (RPD) aşımı spesifik olarak tespit edilmeli ve devre kesici (Circuit Breaker) aktif edilmelidir.
+- **0-Retry ve Hızlı Fallback:** RPD kotası dolduğunda üst üste deneme (exponential backoff retry) yapılmamalı, <1ms içinde anında `generateFallbackSummary` / `generateRuleBasedConsensusFallback` kural tabanlı özet fonksiyonlarına düşülmelidir.
+- **In-Flight Lock Güvenliği:** `inFlightConsensusLocks` kilitleri `try/finally` bloklarında mutlaka serbest bırakılmalıdır.
+
+## 33. Süreç Kararlılığı ve Graceful Shutdown Kısıtları (Aşama 16 Kısıtları)
+
+- **Beklenmeyen Hata Koruması:** `uncaughtException` veya `unhandledRejection` durumlarında sunucunun bozuk bellek durumuyla (corrupted memory state) sessizce açık kalması YASAKTIR.
+- **Güvenli Kapanma (`gracefulShutdown`):** Beklenmeyen bir istisna durumunda `httpServer.close()` ve `io.close()` ile bağlantılar reddedilir, 500ms grace period ile bekleyen yazmalar flush edilir ve `process.exit(1)` ile süreç kapatılarak dış süreç yöneticisine (PM2 / `node --watch`) temiz başlangıç için devredilir.
+
+## 34. Test ve Kalite Standartları
+
+- **Test Kapsamı:** Tüm mimari değişiklikler Vitest test paketine dahil edilmeli ve `npx vitest run` ile 116 testin tamamının geçmesi (%100 Başarı) zorunludur.
+
