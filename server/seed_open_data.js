@@ -295,30 +295,43 @@ async function seedOpenData() {
       }))
     };
 
-    // LLM Yönetici Özeti Üret
-    console.log(`  -> Yönetici Özeti Oluşturuluyor...`);
-    const execSummaryData = {
-      question: ds.question,
-      participantsCount: participants.length,
-      statementsCount: statements.length,
-      campsCount: k,
-      camps: analysisResults.camps,
-      polarisability: polResult.polarisability,
-      bridgesCount: analysisResults.bridges.length,
-      bridgesText: analysisResults.bridges.map(b => b.text),
-      participationGini,
-      voteCompletionRate
-    };
-    const executiveSummary = await Promise.race([
-      generateExecutiveSummary(execSummaryData),
-      new Promise(res => setTimeout(() => res(null), 4000))
-    ]).catch(() => null);
+    // Check if session already exists in DB (Requirement 6 - Idempotent Seed Import)
+    const existingSession = await prisma.session.findUnique({ where: { code: ds.code } });
+    let executiveSummary = null;
+
+    if (existingSession && existingSession.analysis) {
+      console.log(`⚡ [SEED IDEMPOTENT] Oturum ${ds.code} zaten veritabanında mevcut ve analiz edilmiş.`);
+      console.log(`   -> Saklanan LLM metinleri yeniden kullanılıyor, LLM API çağrısı ATLANDI.`);
+      const existingAnalysis = typeof existingSession.analysis === 'string' ? JSON.parse(existingSession.analysis) : existingSession.analysis;
+      if (existingAnalysis) {
+        executiveSummary = existingAnalysis.executiveSummary || null;
+      }
+    } else {
+      // LLM Yönetici Özeti Üret (Sadece ilk tohumlamada)
+      console.log(`🌐 [SEED LLM CALL] Yeni oturum ${ds.code} için Yönetici Özeti oluşturuluyor...`);
+      const execSummaryData = {
+        question: ds.question,
+        participantsCount: participants.length,
+        statementsCount: statements.length,
+        campsCount: k,
+        camps: analysisResults.camps,
+        polarisability: polResult.polarisability,
+        bridgesCount: analysisResults.bridges.length,
+        bridgesText: analysisResults.bridges.map(b => b.text),
+        participationGini,
+        voteCompletionRate
+      };
+      executiveSummary = await generateExecutiveSummary(execSummaryData, ds.code).catch(() => null);
+    }
+
+    if (executiveSummary) {
+      analysisResults.executiveSummary = executiveSummary;
+    }
 
     // 4. Veritabanında Oturumu Oluştur / Upsert Et
     console.log(`  -> Oturum veritabanına kaydediliyor (${ds.code})...`);
 
     // Varolan eski kaydı temizle
-    const existingSession = await prisma.session.findUnique({ where: { code: ds.code } });
     if (existingSession) {
       await prisma.session.delete({ where: { id: existingSession.id } }).catch(() => {});
     }

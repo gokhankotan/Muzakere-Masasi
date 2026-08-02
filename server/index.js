@@ -643,6 +643,8 @@ app.get('/api/sessions/:code/report', checkParticipantAccess, async (req, res) =
   }
 });
 
+const inFlightConsensusLocks = new Map();
+
 // 8.0b. Uzlaşı Potansiyeli Keşfi (REST API)
 app.post('/api/sessions/:code/discover-consensus', requireSessionOwnership, async (req, res) => {
   const { code } = req.params;
@@ -659,8 +661,24 @@ app.post('/api/sessions/:code/discover-consensus', requireSessionOwnership, asyn
       return res.status(400).json({ success: false, message: 'Yeterli veri veya analiz bulunmadığından uzlaşı analizi yapılamaz.' });
     }
 
-    // Call LLM
-    const consensusPotential = await discoverConsensusPotential(analysis.camps, session.question);
+    // In-Flight Lock & Deduplication per session code (Requirement 3)
+    if (inFlightConsensusLocks.has(upperCode)) {
+      console.log(`🔒 [LLM IN-FLIGHT DEDUP] Concurrent request for session ${upperCode} detected. Joining active in-flight promise...`);
+      const consensusPotential = await inFlightConsensusLocks.get(upperCode);
+      return res.json({ success: true, consensusPotential });
+    }
+
+    const consensusPromise = (async () => {
+      try {
+        return await discoverConsensusPotential(analysis.camps, session.question, upperCode);
+      } finally {
+        inFlightConsensusLocks.delete(upperCode);
+      }
+    })();
+
+    inFlightConsensusLocks.set(upperCode, consensusPromise);
+    const consensusPotential = await consensusPromise;
+
     res.json({ success: true, consensusPotential });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Şu an uzlaşı potansiyeli analiz edilemedi.' });

@@ -37,6 +37,7 @@ export default function AdminDashboard({
   const [consensusResult, setConsensusResult] = useState('');
   const [consensusError, setConsensusError] = useState('');
   const [discoveringConsensus, setDiscoveringConsensus] = useState(false);
+  const lastConsensusClickRef = React.useRef(0);
 
   const fetchActionLogs = () => {
     const token = localStorage.getItem('admin_token');
@@ -175,6 +176,15 @@ export default function AdminDashboard({
   };
 
   const handleDiscoverConsensus = async () => {
+    if (discoveringConsensus) return;
+
+    // Debounce protection: Disable consecutive rapid clicks within 1000ms
+    const now = Date.now();
+    if (now - lastConsensusClickRef.current < 1000) {
+      return;
+    }
+    lastConsensusClickRef.current = now;
+
     setConsensusError('');
     setConsensusResult('');
     setDiscoveringConsensus(true);
