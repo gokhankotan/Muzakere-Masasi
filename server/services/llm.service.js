@@ -260,7 +260,7 @@ Notlar:
 - Çıktı sadece 1-2 cümlelik özet metinden oluşmalıdır, başka açıklama ekleme.
 `;
 
-    const response = await openaiClient.chat.completions.create({
+    const requestParams = {
       model: modelName,
       messages: [
         { role: 'system', content: 'Sen müzakere verilerini ve fikir gruplarını özetleyen tarafsız bir analiz asistanısın.' },
@@ -268,7 +268,13 @@ Notlar:
       ],
       max_tokens: 150,
       temperature: 0.5,
-    });
+    };
+
+    if (process.env.LLM_REASONING_EFFORT) {
+      requestParams.reasoning_effort = process.env.LLM_REASONING_EFFORT;
+    }
+
+    const response = await openaiClient.chat.completions.create(requestParams);
 
     const raw = response.choices[0]?.message?.content?.trim();
     const summary = sanitizeLLMResponse(raw, 'cluster-summary');
@@ -359,7 +365,7 @@ Eğer görüş tamamen uygunsa:
 {"flagged": false, "reason": null}
 `;
 
-    const response = await openaiClient.chat.completions.create({
+    const requestParams = {
       model: modelName,
       messages: [
         { role: 'system', content: 'Sen müzakere görüşlerini denetleyen, sadece JSON formatında yanıt veren objektif bir moderatör yardımcısısın.' },
@@ -367,7 +373,13 @@ Eğer görüş tamamen uygunsa:
       ],
       max_tokens: 100,
       temperature: 0.1, // Düşük sıcaklık daha kararlı JSON çıktısı sağlar
-    });
+    };
+
+    if (process.env.LLM_REASONING_EFFORT) {
+      requestParams.reasoning_effort = process.env.LLM_REASONING_EFFORT;
+    }
+
+    const response = await openaiClient.chat.completions.create(requestParams);
 
     const content = response.choices[0]?.message?.content?.trim();
     const sanitized = sanitizeLLMResponse(content, 'moderation');
@@ -435,7 +447,7 @@ KESİN KURALLAR:
     const maxAttempts = 3;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        const response = await openaiClient.chat.completions.create({
+        const requestParams = {
           model: modelName,
           messages: [
             { role: 'system', content: systemPrompt },
@@ -443,7 +455,13 @@ KESİN KURALLAR:
           ],
           max_tokens: 4000,
           temperature: 0.3,
-        });
+        };
+
+        if (process.env.LLM_REASONING_EFFORT) {
+          requestParams.reasoning_effort = process.env.LLM_REASONING_EFFORT;
+        }
+
+        const response = await openaiClient.chat.completions.create(requestParams);
 
         const raw = response.choices[0]?.message?.content?.trim();
         const extracted = extractDelimited(raw);
@@ -541,7 +559,7 @@ KESİN KURALLAR:
 - Yalnızca ortak temayı tarif et ve moderatör için süreç önerisi ver.
 - Çıktı doğrudan ve tarafsız bir Türkçe paragraf olmalıdır. Başlık, "1. 2." gibi numaralandırma veya düşünme adımı ekleme.`;
 
-    const response = await openaiClient.chat.completions.create({
+    const requestParams = {
       model: modelName,
       messages: [
         { role: 'system', content: 'Sen müzakere grupları arasındaki ortak temaları analiz eden ve moderatör için süreç önerisi sunan tarafsız bir arabulucu asistansın. Yalnızca Türkçe yanıt metnini yaz.' },
@@ -549,7 +567,13 @@ KESİN KURALLAR:
       ],
       max_tokens: 1000,
       temperature: 0.4,
-    });
+    };
+
+    if (process.env.LLM_REASONING_EFFORT) {
+      requestParams.reasoning_effort = process.env.LLM_REASONING_EFFORT;
+    }
+
+    const response = await openaiClient.chat.completions.create(requestParams);
 
     const raw = response.choices[0]?.message?.content?.trim();
     const result = sanitizeLLMResponse(raw, 'consensus-discovery');
@@ -640,7 +664,7 @@ ${bridgesList}
     const maxAttempts = 3;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        const response = await openaiClient.chat.completions.create({
+        const requestParams = {
           model: modelName,
           messages: [
             { role: 'system', content: systemPrompt },
@@ -648,7 +672,13 @@ ${bridgesList}
           ],
           max_tokens: 4000,
           temperature: 0.3,
-        });
+        };
+
+        if (process.env.LLM_REASONING_EFFORT) {
+          requestParams.reasoning_effort = process.env.LLM_REASONING_EFFORT;
+        }
+
+        const response = await openaiClient.chat.completions.create(requestParams);
 
         const raw = response.choices[0]?.message?.content?.trim();
         const extracted = extractDelimited(raw);

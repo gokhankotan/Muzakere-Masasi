@@ -15,7 +15,7 @@ import bcrypt from 'bcrypt';
 import { db } from './database.js';
 import { calculatePCA, runKMeansWithStability, analyzeCampsAndBridges, alignCentroids, calculatePolarisability, calculateKMeans } from './algorithms.js';
 import { authenticateAdmin, passwordRateLimiter, checkParticipantAccess, checkModerator, verifySessionToken, requireSessionOwnership, isSessionOwner } from './middleware/auth.middleware.js';
-import { generateClusterSummary, evaluateOpinionContent, generateAxisLabel, generatePolarizationImpactDescription, discoverConsensusPotential, generateExecutiveSummary } from './services/llm.service.js';
+import { generateClusterSummary, evaluateOpinionContent, generateAxisLabel, generatePolarizationImpactDescription, discoverConsensusPotential, generateExecutiveSummary, sanitizeLLMResponse } from './services/llm.service.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -746,7 +746,7 @@ function runAndBroadcastAnalysis(sessionCode) {
   performAnalysis(sessionCode);
 }
 
-async function performAnalysis(sessionCode) {
+export async function performAnalysis(sessionCode) {
   const session = db.getSessionSync(sessionCode);
   if (!session) return;
 
@@ -808,17 +808,20 @@ async function performAnalysis(sessionCode) {
 
   const prevAxisLabels = session.analysis?.axisLabels || {};
   if (process.env.DISABLE_LLM_CACHE !== 'true' && prevAxisLabels.signatureX === signatureX && prevAxisLabels.x) {
-    axisLabelX = prevAxisLabels.x;
-  } else {
+    const validX = sanitizeLLMResponse(prevAxisLabels.x, 'axis-label');
+    if (validX) axisLabelX = validX;
+  }
+  if (!axisLabelX) {
     axisLabelX = await generateAxisLabel('x', top3X);
   }
 
   if (process.env.DISABLE_LLM_CACHE !== 'true' && prevAxisLabels.signatureY === signatureY && prevAxisLabels.y) {
-    axisLabelY = prevAxisLabels.y;
-  } else {
+    const validY = sanitizeLLMResponse(prevAxisLabels.y, 'axis-label');
+    if (validY) axisLabelY = validY;
+  }
+  if (!axisLabelY) {
     axisLabelY = await generateAxisLabel('y', top3Y);
   }
-
 
   // Koordinatları görselleştirme için normalize et (-80 ile 80 arasına çek)
   let minX = Infinity, maxX = -Infinity;
@@ -904,8 +907,10 @@ async function performAnalysis(sessionCode) {
     let summary = '';
     const prevCamp = session.analysis?.camps?.find(c => c.id === cIdx);
     if (process.env.DISABLE_LLM_CACHE !== 'true' && prevCamp && prevCamp.signature === signature && prevCamp.summary) {
-      summary = prevCamp.summary;
-    } else {
+      const validSummary = sanitizeLLMResponse(prevCamp.summary, 'cluster-summary');
+      if (validSummary) summary = validSummary;
+    }
+    if (!summary) {
       summary = await generateClusterSummary(cIdx, topStatements);
     }
 
@@ -1418,7 +1423,9 @@ io.on('connection', (socket) => {
   });
 });
 
-const PORT = process.env.PORT || 3001;
-httpServer.listen(PORT, () => {
-  console.log(`Sunucu http://localhost:${PORT} portunda çalışıyor.`);
-});
+if (process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
+  const PORT = process.env.PORT || 3001;
+  httpServer.listen(PORT, () => {
+    console.log(`Sunucu http://localhost:${PORT} portunda çalışıyor.`);
+  });
+}

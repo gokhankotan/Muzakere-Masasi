@@ -689,3 +689,64 @@ planı ve onayıyla, birbirine karışmadan uygulanmalı.
   sadece KMeans+kutuplaşmayı yeniden çalıştırmak — bu, madde 19'daki
   matematiksel doğrulama testlerinin YENİDEN çalıştırılmasını gerektirir,
   ayrı bir görev olarak ele alınmalı.
+
+## 26. Reasoning Effort Parametresi — Sağlayıcıya Göre Esnek, Varsayılan Kapalı
+
+- **Yeni ortam değişkeni:** `LLM_REASONING_EFFORT` (opsiyonel, değerler:
+  `none`/`low`/`medium`/`high`, ya da tanımsız).
+- **Davranış:** Bu değişken `.env`'de TANIMLIYSA, tüm LLM çağrılarına
+  `reasoning_effort: process.env.LLM_REASONING_EFFORT` parametresi eklenir.
+  TANIMLI DEĞİLSE, bu parametre isteğe HİÇ EKLENMEZ (kurumun Qwen tabanlı
+  API'si bu parametreyi tanımıyor/reddediyor olabilir, varsayılan davranış
+  kurumun API'sini etkilememelidir).
+- **Kullanım:** Gemini ile test ederken `.env`'e `LLM_REASONING_EFFORT=none`
+  eklenir — bu, Gemini 2.5 ailesinde düşünmeyi API seviyesinde kapatır.
+  Kuruma dönüldüğünde bu satır `.env`'den kaldırılır/yorum satırına alınır.
+- **Madde 20/23'teki güvenlik ağı KALDIRILMAZ:** `sanitizeLLMResponse` ve
+  #3/#6 için delimiter+retry mekanizması, hangi sağlayıcı kullanılırsa
+  kullanılsın KORUNUR — bu, ucuz bir sigorta, `reasoning_effort` bir
+  sağlayıcıda beklendiği gibi çalışmazsa/yoksayılırsa yine devrede olmalı.
+- **Test:** Gemini + `reasoning_effort=none` ile tüm 6 çağrı noktası
+  tekrar test edilir, hem sızıntı oranı hem de gecikme (özellikle #6
+  yönetici özeti) ölçülür — düşünme kapalıyken bu ikisinin de iyileşmesi
+  beklenir.
+
+## 27. Sızıntı, Gerçek Kullanıcı Arayüzünde Hâlâ Görünüyor — Test/Üretim Farkı Şüphesi
+
+- **Bulgu (ekran görüntüsüyle doğrulandı):** Katılımcının canlı harita
+  ekranında hem eksen etiketleri hem de "Şu anki Grubunuz" kamp açıklaması,
+  madde 20/23'teki düzeltmelerin ÖNCESİNDEKİ ham sızıntı formatını
+  gösteriyor — `[CEVAP]` etiketine dair hiçbir iz yok.
+- **İki olası neden, İKİSİ DE ayrı ayrı kontrol edilmeli:**
+  1. Katılımcı ekranındaki kamp özeti, test edilen `generateClusterSummary`
+     fonksiyonundan FARKLI bir kod yolundan çağrılıyor olabilir (sanitizasyon
+     bu yola hiç uygulanmamış).
+  2. `Session.analysis` içinde ÖNCEDEN (düzeltmeden önce) cache'lenmiş
+     bozuk metin, madde 18'in imza mantığı gereği hâlâ kullanılıyor
+     olabilir — imza değişmediği sürece eski veri temizlenmiyor.
+- **Zorunlu doğrulama yöntemi:** Bundan sonra HERHANGİ bir LLM düzeltmesi
+  "tamamlandı" denmeden önce, hem (a) izole test script'inde HEM DE (b)
+  gerçek çalışan uygulamanın GERÇEK ekranında (tarayıcıda, yeni bir
+  oturumla, önbellek temizlenmiş halde) doğrulanmalı. Sadece test
+  script'inin geçmesi yeterli kanıt SAYILMAZ.
+
+## 27b. Madde 27 Kapatıldı — Görsel Kanıt ve Gerçek LLM Çağrı Sayısı Netleşti
+
+- **Görsel kanıt alındı:** BG2050 oturumunun katılımcı ekranında (ekran
+  görüntüsüyle doğrulandı), eksen etiketleri ve kamp özeti artık temiz
+  Türkçe metin gösteriyor, sızıntı yok. Madde 27'deki sorun ÇÖZÜLMÜŞ
+  sayılır.
+- **Gerçek LLM çağrı noktası sayısı: 5, 6 DEĞİL.** Kutuplaşma etkisi
+  açıklaması (madde 17/19'da "#4" olarak anılan) LLM API'sine HİÇ istek
+  atmıyor — tamamen deterministik bir JS şablonu (leave-one-out'un
+  hesapladığı sayısal değeri bir cümle kalıbına yerleştiriyor). Bu
+  belgedeki önceki bölümlerde geçen "6 LLM çağrı noktası" ifadeleri
+  (madde 19, 20, 22, 24, 26) bu haliyle GEÇERSİZDİR — gerçek sayı 5'tir:
+  1. Küme Özeti (`generateClusterSummary`)
+  2. Görüş Moderasyonu (`evaluateOpinionContent`)
+  3. Eksen Etiketleme (`generateAxisLabel`)
+  4. Uzlaşı Keşfi (`discoverConsensusPotential`)
+  5. Yönetici Rapor Özeti (`generateExecutiveSummary`)
+- **Kurumla paylaşılacak kota/hacim tahmini, 5 LLM çağrı noktası üzerinden
+  güncellenmelidir** — kutuplaşma etkisi açıklaması bu hesaba dahil
+  edilmemeli, çünkü kurumun API'sine hiç yük bindirmiyor.
