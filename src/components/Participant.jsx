@@ -584,87 +584,87 @@ export default function Participant({
                 <button
                   onClick={toggleExplanation}
                   style={{
-                    background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(168, 85, 247, 0.15) 100%)',
-                    border: '1px solid rgba(168, 85, 247, 0.4)',
+                    background: 'rgba(6, 182, 212, 0.08)',
+                    border: '1px solid rgba(6, 182, 212, 0.3)',
                     borderRadius: '20px',
-                    padding: '0.4rem 0.95rem',
+                    padding: '0.35rem 0.85rem',
                     fontSize: '0.78rem',
-                    color: '#c084fc',
-                    fontWeight: 700,
+                    color: '#22d3ee',
+                    fontWeight: 600,
                     cursor: 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '0.4rem',
-                    boxShadow: '0 2px 10px rgba(168, 85, 247, 0.15)',
-                    transition: 'all 0.25 ease'
+                    gap: '0.35rem',
+                    transition: 'all 0.2s ease'
                   }}
                 >
-                  <span style={{ fontSize: '0.9rem' }}>🎯</span>
+                  <span>🎯</span>
                   <span>{lang === 'tr' ? 'Neden bu gruptayım?' : 'Why am I in this group?'}</span>
                 </button>
               </div>
 
-              {/* Şeffaflık Paneli (Expandable Vibrant Card) */}
+              {/* Şeffaflık Paneli (Tek Renk Turkuaz Tema — Az Duyulan Argümanlar Formatında) */}
               {showExplanation && (
                 <div style={{
-                  marginTop: '0.85rem',
-                  background: 'linear-gradient(135deg, rgba(30, 27, 75, 0.65) 0%, rgba(15, 23, 42, 0.8) 100%)',
-                  border: '1px solid rgba(168, 85, 247, 0.35)',
-                  boxShadow: '0 8px 32px rgba(99, 102, 241, 0.15)',
-                  borderRadius: '12px',
-                  padding: '1rem 1.15rem',
+                  marginTop: '0.75rem',
+                  background: 'rgba(6, 182, 212, 0.05)',
+                  border: '1px solid rgba(6, 182, 212, 0.25)',
+                  borderRadius: '8px',
+                  padding: '0.85rem 1rem',
                   textAlign: 'left',
                   fontSize: '0.82rem'
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-                    <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#e0e7ff', display: 'flex', alignItems: 'center', gap: '0.45rem', margin: 0 }}>
-                      <span style={{ background: 'rgba(168, 85, 247, 0.2)', padding: '0.2rem 0.45rem', borderRadius: '6px' }}>🎯</span>
-                      <span>{lang === 'tr' ? 'Sizi Bu Kampa Yaklaştıran Belirleyici Oylarınız' : 'Votes Aligning You With This Group'}</span>
-                    </h4>
-                  </div>
-                  <p style={{ fontSize: '0.76rem', color: '#94a3b8', marginBottom: '0.85rem', lineHeight: 1.4 }}>
+                  <h4 style={{
+                    fontSize: '0.88rem',
+                    fontWeight: 700,
+                    color: '#22d3ee',
+                    marginBottom: '0.4rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.4rem'
+                  }}>
+                    <span>🎯</span>
+                    <span>{lang === 'tr' ? 'Sizi Bu Kampa Yaklaştıran Oylarınız' : 'Votes Bringing You to This Group'}</span>
+                  </h4>
+                  <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.75rem', lineHeight: 1.4 }}>
                     {lang === 'tr'
-                      ? 'Grup oy eğilimleri ile kendi oylarınızın birebir matematiksel eşleşme analizi:'
-                      : 'Mathematical alignment analysis of your votes with group consensus:'}
+                      ? 'Bu görüşler grubunuzun genel oy eğilimi ile en yüksek uyumu gösteren oylarınızdır.'
+                      : 'These opinions show the highest vote alignment with your group.'}
                   </p>
 
                   {loadingExplanation ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#c084fc', fontStyle: 'italic', fontSize: '0.8rem', padding: '0.5rem 0' }}>
-                      <span className="spinner" style={{ borderTopColor: '#c084fc' }}></span>
-                      <span>{lang === 'tr' ? 'Katılım haritanız ve gruptaki oy oranları hesaplanıyor...' : 'Calculating alignment map...'}</span>
-                    </div>
+                    <p style={{ fontStyle: 'italic', color: '#22d3ee', fontSize: '0.78rem' }}>
+                      ⏳ {lang === 'tr' ? 'Hesaplanıyor...' : 'Calculating...'}
+                    </p>
                   ) : explanationError ? (
-                    <div style={{ padding: '0.6rem 0.85rem', background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.35)', borderRadius: '8px', color: '#f87171', fontSize: '0.8rem' }}>
+                    <div style={{ padding: '0.5rem 0.75rem', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '6px', color: '#ef4444', fontSize: '0.78rem' }}>
                       ⚠️ {explanationError}
                     </div>
                   ) : campExplanation && campExplanation.definingVotes && campExplanation.definingVotes.length > 0 ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
                       {campExplanation.definingVotes.map((vote, idx) => {
                         const isAgree = vote.userVote === 'AGREE';
                         const alignmentPct = Math.round((vote.alignmentScore || 0) * 100);
 
                         return (
                           <div key={vote.statementId || idx} style={{
-                            background: isAgree
-                              ? 'linear-gradient(135deg, rgba(34, 197, 94, 0.08) 0%, rgba(16, 185, 129, 0.03) 100%)'
-                              : 'linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(244, 63, 94, 0.03) 100%)',
-                            border: `1px solid ${isAgree ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
-                            borderLeft: `4px solid ${isAgree ? '#22c55e' : '#ef4444'}`,
-                            borderRadius: '8px',
-                            padding: '0.65rem 0.85rem',
-                            boxShadow: `0 2px 10px ${isAgree ? 'rgba(34, 197, 94, 0.06)' : 'rgba(239, 68, 68, 0.06)'}`
+                            background: 'rgba(6, 182, 212, 0.06)',
+                            border: '1px solid rgba(6, 182, 212, 0.25)',
+                            borderLeft: '3px solid #06b6d4',
+                            borderRadius: '7px',
+                            padding: '0.65rem 0.85rem'
                           }}>
-                            <div style={{ fontSize: '0.83rem', color: '#f8fafc', fontWeight: 500, marginBottom: '0.5rem', lineHeight: 1.45 }}>
+                            <div style={{ fontSize: '0.82rem', color: 'var(--text-main)', lineHeight: 1.5, marginBottom: '0.4rem' }}>
                               "{vote.text}"
                             </div>
-                            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', fontSize: '0.73rem', flexWrap: 'wrap' }}>
+                            <div style={{ display: 'flex', gap: '0.6rem', fontSize: '0.72rem', color: 'var(--text-muted)', flexWrap: 'wrap' }}>
                               <span style={{
-                                background: isAgree ? 'rgba(34, 197, 94, 0.18)' : 'rgba(239, 68, 68, 0.18)',
-                                color: isAgree ? '#4ade80' : '#f87171',
-                                border: `1px solid ${isAgree ? 'rgba(34, 197, 94, 0.35)' : 'rgba(239, 68, 68, 0.35)'}`,
+                                background: 'rgba(6, 182, 212, 0.15)',
+                                border: '1px solid rgba(6, 182, 212, 0.3)',
                                 borderRadius: '999px',
-                                padding: '0.12rem 0.55rem',
-                                fontWeight: 700
+                                padding: '0.1rem 0.45rem',
+                                color: '#22d3ee',
+                                fontWeight: 600
                               }}>
                                 {isAgree ? (
                                   <>👍 {lang === 'tr' ? 'Katılıyorum' : 'Agreed'}</>
@@ -674,11 +674,11 @@ export default function Participant({
                               </span>
 
                               <span style={{
-                                background: 'rgba(168, 85, 247, 0.15)',
-                                color: '#c084fc',
-                                border: '1px solid rgba(168, 85, 247, 0.3)',
+                                background: 'rgba(6, 182, 212, 0.12)',
+                                border: '1px solid rgba(6, 182, 212, 0.25)',
                                 borderRadius: '999px',
-                                padding: '0.12rem 0.55rem',
+                                padding: '0.1rem 0.45rem',
+                                color: '#38bdf8',
                                 fontWeight: 600
                               }}>
                                 📊 {lang === 'tr' ? `Grup Kabulü: %${vote.campApprovalRate}` : `Group Approval: %${vote.campApprovalRate}`}
@@ -686,11 +686,11 @@ export default function Participant({
 
                               {alignmentPct > 0 && (
                                 <span style={{
-                                  background: 'rgba(14, 165, 233, 0.15)',
-                                  color: '#38bdf8',
-                                  border: '1px solid rgba(14, 165, 233, 0.3)',
+                                  background: 'rgba(6, 182, 212, 0.18)',
+                                  border: '1px solid rgba(6, 182, 212, 0.35)',
                                   borderRadius: '999px',
-                                  padding: '0.12rem 0.55rem',
+                                  padding: '0.1rem 0.45rem',
+                                  color: '#22d3ee',
                                   fontWeight: 600
                                 }}>
                                   🧠 {lang === 'tr' ? `Uyum Skoru: %${alignmentPct}` : `Alignment: %${alignmentPct}`}
@@ -702,10 +702,10 @@ export default function Participant({
                       })}
                     </div>
                   ) : (
-                    <div style={{ padding: '0.75rem', border: '1px dashed rgba(168, 85, 247, 0.3)', borderRadius: '8px', textAlign: 'center', color: '#94a3b8', fontSize: '0.78rem' }}>
+                    <div style={{ padding: '0.75rem', border: '1px dashed rgba(6, 182, 212, 0.25)', borderRadius: '7px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.78rem' }}>
                       💡 {lang === 'tr'
-                        ? 'Henüz grubunuza olan belirleyici oy veriniz hesaplanmadı. Lütfen birkaç görüş daha oylayın!'
-                        : 'Not enough defining vote data yet. Please vote on a few more opinions!'}
+                        ? 'Henüz grubunuza olan belirleyici oy veriniz hesaplanmadı.'
+                        : 'Not enough defining vote data yet.'}
                     </div>
                   )}
                 </div>
