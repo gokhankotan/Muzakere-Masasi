@@ -474,92 +474,135 @@ app.get('/api/sessions/:code/report', checkParticipantAccess, async (req, res) =
 
     let polarizationImpacts = [];
     if (n >= 10 && m >= 5) {
-      // 1. Calculate actual polarization score
-      const X_full = activeParticipants.map(p => statements.map(st => p.votes[st.id] !== undefined ? p.votes[st.id] : null));
-      const pcaFull = calculatePCA(X_full, 2);
-      const scoresFull = pcaFull.scores;
-      let minX = Infinity, maxX = -Infinity;
-      let minY = Infinity, maxY = -Infinity;
-      scoresFull.forEach(pt => {
-        if (pt[0] < minX) minX = pt[0];
-        if (pt[0] > maxX) maxX = pt[0];
-        if (pt[1] < minY) minY = pt[1];
-        if (pt[1] > maxY) maxY = pt[1];
-      });
-      const rangeX = maxX - minX;
-      const rangeY = maxY - minY;
-      const coordsFull = activeParticipants.map((p, i) => {
-        let xCoord = 0;
-        let yCoord = 0;
-        if (rangeX > 1e-5) xCoord = ((scoresFull[i][0] - minX) / rangeX) * 160 - 80;
-        if (rangeY > 1e-5) yCoord = ((scoresFull[i][1] - minY) / rangeY) * 160 - 80;
-        return [xCoord, yCoord];
-      });
-      const k = Math.min(session.targetK || 3, n);
-      const kmFull = runKMeansWithStability(coordsFull, k, 5);
-      const pointsFull = coordsFull.map((c, i) => ({ x: c[0], y: c[1], campId: kmFull.assignments[i] }));
-      const campsFull = Array(k).fill(0).map((_, cIdx) => {
-        const size = pointsFull.filter(pt => pt.campId === cIdx).length;
-        const c = kmFull.centroids[cIdx] || [0, 0];
-        return { id: cIdx, size, x: c[0], y: c[1] };
-      });
-      // 1. Calculate actual polarization score on normalized [-80,+80] coords (same space as K-Means)
-      const pointsFullNorm = coordsFull.map((c, i) => ({ x: c[0], y: c[1], campId: kmFull.assignments[i] }));
-      const campsFullNorm = Array(k).fill(0).map((_, cIdx) => {
-        const campPts = pointsFullNorm.filter(pt => pt.campId === cIdx);
-        const size = campPts.length;
-        const meanX = size > 0 ? campPts.reduce((sum, p) => sum + p.x, 0) / size : 0;
-        const meanY = size > 0 ? campPts.reduce((sum, p) => sum + p.y, 0) / size : 0;
-        return { id: cIdx, size, x: meanX, y: meanY };
-      });
-      const polFullNorm = calculatePolarisability(pointsFullNorm, campsFullNorm);
-      const actualPolarisability = polFullNorm.polarisability !== null ? polFullNorm.polarisability : 0;
+      // Create unique signature based on active participants, statements count, total votes, and statement IDs
+      const totalVotesCount = activeParticipants.reduce((sum, p) => sum + Object.keys(p.votes || {}).length, 0);
+      const statementsHash = statements.map(s => s.id).sort().join('-');
+      const currentSignature = `${n}_${m}_${totalVotesCount}_${statementsHash}`;
 
-      // 2. Run leave-one-out sensitivity analysis (all in normalized [-80,+80] space)
-      const impacts = statements.map((targetOpinion) => {
-        const filteredStatements = statements.filter(st => st.id !== targetOpinion.id);
-        const X_filtered = activeParticipants.map(p => filteredStatements.map(st => p.votes[st.id] !== undefined ? p.votes[st.id] : null));
-        const pcaFiltered = calculatePCA(X_filtered, 2);
-        const scoresFiltered = pcaFiltered.scores;
-        // Normalize filtered scores to [-80, +80]
-        let fMinX = Infinity, fMaxX = -Infinity, fMinY = Infinity, fMaxY = -Infinity;
-        scoresFiltered.forEach(pt => {
-          if (pt[0] < fMinX) fMinX = pt[0];
-          if (pt[0] > fMaxX) fMaxX = pt[0];
-          if (pt[1] < fMinY) fMinY = pt[1];
-          if (pt[1] > fMaxY) fMaxY = pt[1];
+      if (session.polarizationImpactCache && session.polarizationImpactCache.signature === currentSignature) {
+        console.log(`[Report Cache HIT] Oturum ${upperCode} için kutuplaşma etki analizi önbellekten alındı (Hesaplama atlandı).`);
+        polarizationImpacts = session.polarizationImpactCache.polarizationImpacts;
+      } else {
+        console.log(`[Report Cache MISS] Oturum ${upperCode} için kutuplaşma etki analizi yeniden hesaplanıyor...`);
+        // 1. Calculate actual polarization score
+        const X_full = activeParticipants.map(p => statements.map(st => p.votes[st.id] !== undefined ? p.votes[st.id] : null));
+        const pcaFull = calculatePCA(X_full, 2);
+        const scoresFull = pcaFull.scores;
+        let minX = Infinity, maxX = -Infinity;
+        let minY = Infinity, maxY = -Infinity;
+        scoresFull.forEach(pt => {
+          if (pt[0] < minX) minX = pt[0];
+          if (pt[0] > maxX) maxX = pt[0];
+          if (pt[1] < minY) minY = pt[1];
+          if (pt[1] > maxY) maxY = pt[1];
         });
-        const fRangeX = fMaxX - fMinX;
-        const fRangeY = fMaxY - fMinY;
-        const coordsFiltered = scoresFiltered.map(pt => {
-          const x = fRangeX > 1e-5 ? ((pt[0] - fMinX) / fRangeX) * 160 - 80 : 0;
-          const y = fRangeY > 1e-5 ? ((pt[1] - fMinY) / fRangeY) * 160 - 80 : 0;
-          return [x, y];
+        const rangeX = maxX - minX;
+        const rangeY = maxY - minY;
+        const coordsFull = activeParticipants.map((p, i) => {
+          let xCoord = 0;
+          let yCoord = 0;
+          if (rangeX > 1e-5) xCoord = ((scoresFull[i][0] - minX) / rangeX) * 160 - 80;
+          if (rangeY > 1e-5) yCoord = ((scoresFull[i][1] - minY) / rangeY) * 160 - 80;
+          return [xCoord, yCoord];
         });
-        const kmFiltered = runKMeansWithStability(coordsFiltered, k, 5);
-        const ptsFiltered = coordsFiltered.map((c, i) => ({ x: c[0], y: c[1], campId: kmFiltered.assignments[i] }));
-        const campsFiltered = Array(k).fill(0).map((_, cIdx) => {
-          const campPts = ptsFiltered.filter(pt => pt.campId === cIdx);
+        const k = Math.min(session.targetK || 3, n);
+        const kmFull = runKMeansWithStability(coordsFull, k, 5);
+        const pointsFull = coordsFull.map((c, i) => ({ x: c[0], y: c[1], campId: kmFull.assignments[i] }));
+        const campsFull = Array(k).fill(0).map((_, cIdx) => {
+          const size = pointsFull.filter(pt => pt.campId === cIdx).length;
+          const c = kmFull.centroids[cIdx] || [0, 0];
+          return { id: cIdx, size, x: c[0], y: c[1] };
+        });
+        // 1. Calculate actual polarization score on normalized [-80,+80] coords (same space as K-Means)
+        const pointsFullNorm = coordsFull.map((c, i) => ({ x: c[0], y: c[1], campId: kmFull.assignments[i] }));
+        const campsFullNorm = Array(k).fill(0).map((_, cIdx) => {
+          const campPts = pointsFullNorm.filter(pt => pt.campId === cIdx);
           const size = campPts.length;
           const meanX = size > 0 ? campPts.reduce((sum, p) => sum + p.x, 0) / size : 0;
           const meanY = size > 0 ? campPts.reduce((sum, p) => sum + p.y, 0) / size : 0;
           return { id: cIdx, size, x: meanX, y: meanY };
         });
-        const polFiltered = calculatePolarisability(ptsFiltered, campsFiltered);
-        const polarisabilityWithoutOpinion = polFiltered.polarisability !== null ? polFiltered.polarisability : 0;
-        
-        const impact = actualPolarisability - polarisabilityWithoutOpinion;
-        const description = generatePolarizationImpactDescription(impact);
-        
-        return {
-          opinionContent: targetOpinion.text,
-          polarizationImpact: parseFloat(impact.toFixed(1)),
-          description
-        };
-      });
+        const polFullNorm = calculatePolarisability(pointsFullNorm, campsFullNorm);
+        const actualPolarisability = polFullNorm.polarisability !== null ? polFullNorm.polarisability : 0;
 
-      // Sort by polarizationImpact descending, take top 5
-      polarizationImpacts = impacts.sort((a, b) => b.polarizationImpact - a.polarizationImpact).slice(0, 5);
+        // 2. Candidate Statement Selection (Top 15 by contrastScore across camps)
+        const { campCharacteristics } = analyzeCampsAndBridges(statements, activeParticipants, kmFull.assignments, k);
+        const statementContrastMap = new Map();
+        
+        // Calculate max contrastScore for each statement across all camps
+        statements.forEach(st => {
+          let maxContrast = 0;
+          for (let c = 0; c < k; c++) {
+            const charItem = (campCharacteristics[c] || []).find(item => item.statement.id === st.id);
+            if (charItem && charItem.contrastScore > maxContrast) {
+              maxContrast = charItem.contrastScore;
+            }
+          }
+          statementContrastMap.set(st.id, maxContrast);
+        });
+
+        // Sort statements by contrastScore descending and take top 15 candidates
+        const candidateStatements = [...statements]
+          .sort((a, b) => (statementContrastMap.get(b.id) || 0) - (statementContrastMap.get(a.id) || 0))
+          .slice(0, 15);
+
+        // 3. Run leave-one-out sensitivity analysis asynchronously with setImmediate chunking
+        const impacts = [];
+        for (const targetOpinion of candidateStatements) {
+          const filteredStatements = statements.filter(st => st.id !== targetOpinion.id);
+          const X_filtered = activeParticipants.map(p => filteredStatements.map(st => p.votes[st.id] !== undefined ? p.votes[st.id] : null));
+          const pcaFiltered = calculatePCA(X_filtered, 2);
+          const scoresFiltered = pcaFiltered.scores;
+          // Normalize filtered scores to [-80, +80]
+          let fMinX = Infinity, fMaxX = -Infinity, fMinY = Infinity, fMaxY = -Infinity;
+          scoresFiltered.forEach(pt => {
+            if (pt[0] < fMinX) fMinX = pt[0];
+            if (pt[0] > fMaxX) fMaxX = pt[0];
+            if (pt[1] < fMinY) fMinY = pt[1];
+            if (pt[1] > fMaxY) fMaxY = pt[1];
+          });
+          const fRangeX = fMaxX - fMinX;
+          const fRangeY = fMaxY - fMinY;
+          const coordsFiltered = scoresFiltered.map(pt => {
+            const x = fRangeX > 1e-5 ? ((pt[0] - fMinX) / fRangeX) * 160 - 80 : 0;
+            const y = fRangeY > 1e-5 ? ((pt[1] - fMinY) / fRangeY) * 160 - 80 : 0;
+            return [x, y];
+          });
+          const kmFiltered = runKMeansWithStability(coordsFiltered, k, 5);
+          const ptsFiltered = coordsFiltered.map((c, i) => ({ x: c[0], y: c[1], campId: kmFiltered.assignments[i] }));
+          const campsFiltered = Array(k).fill(0).map((_, cIdx) => {
+            const campPts = ptsFiltered.filter(pt => pt.campId === cIdx);
+            const size = campPts.length;
+            const meanX = size > 0 ? campPts.reduce((sum, p) => sum + p.x, 0) / size : 0;
+            const meanY = size > 0 ? campPts.reduce((sum, p) => sum + p.y, 0) / size : 0;
+            return { id: cIdx, size, x: meanX, y: meanY };
+          });
+          const polFiltered = calculatePolarisability(ptsFiltered, campsFiltered);
+          const polarisabilityWithoutOpinion = polFiltered.polarisability !== null ? polFiltered.polarisability : 0;
+          
+          const impact = actualPolarisability - polarisabilityWithoutOpinion;
+          const description = generatePolarizationImpactDescription(impact);
+          
+          impacts.push({
+            opinionContent: targetOpinion.text,
+            polarizationImpact: parseFloat(impact.toFixed(1)),
+            description
+          });
+
+          // Yield control to Node.js event loop after each leave-one-out iteration
+          await new Promise(resolve => setImmediate(resolve));
+        }
+
+        // Sort by polarizationImpact descending, take top 5
+        polarizationImpacts = impacts.sort((a, b) => b.polarizationImpact - a.polarizationImpact).slice(0, 5);
+        
+        // Save to cache
+        session.polarizationImpactCache = {
+          signature: currentSignature,
+          polarizationImpacts,
+          calculatedAt: Date.now()
+        };
+      }
     }
 
     const execSummaryData = {

@@ -35,8 +35,19 @@ export default function ReportView({ onBack, sessionCode, lang = "tr" }) {
 
   if (loading) {
     return (
-      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "80vh" }}>
-        <p style={{ color: "#fff" }}>{lang === "tr" ? "Rapor yükleniyor..." : "Loading report..."}</p>
+      <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", height: "80vh", gap: "1.25rem" }}>
+        <div style={{
+          width: "48px",
+          height: "48px",
+          border: "4px solid var(--border-light, rgba(255, 255, 255, 0.1))",
+          borderTopColor: "var(--color-primary, #6366f1)",
+          borderRadius: "50%",
+          animation: "spin 1s linear infinite"
+        }} />
+        <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+        <p style={{ color: "var(--text-main, #fff)", fontSize: "1.05rem", fontWeight: 500, letterSpacing: "0.02em" }}>
+          {lang === "tr" ? "Kutuplaşma etki analizi hesaplanıyor..." : "Calculating polarization impact analysis..."}
+        </p>
       </div>
     );
   }

@@ -642,3 +642,50 @@ planı ve onayıyla, birbirine karışmadan uygulanmalı.
   çıktı verdiği, (b) retry sonrası temiz çıktı verdiği, (c) yine de
   fallback'e düştüğü ayrı ayrı raporlanır — "çalışıyor" demek yetmez,
   oran verilmeli.
+
+## 24. Madde 23 Kısmen Doğrulandı — Son Adım ve Token Maliyeti Notu
+
+- **Durum:** #3 ve #6 için delimiter+retry mekanizması, 2+2 run'lık ham
+  çıktı kanıtıyla (thinking process + [CEVAP] içi gerçek metin) makul
+  ölçüde doğrulandı. Model gerçekten düşünüyor, sonra doğru formatta
+  cevap veriyor, sistem doğru ayrıştırıyor.
+- **Kapatılmadan önce gerekli son adım:** 10'ar run daha (hafif raporlama:
+  sadece deneme numarası + çıkarılan metin, tam ham çıktı ZORUNLU DEĞİL)
+  çalıştırılıp oranın (şu an 2/2, 2/2) daha büyük örneklemde de yüksek
+  kaldığı doğrulanmalı. Retry mekanizmasının (2./3. deneme) en az bir kez
+  gerçekten tetiklendiği bir örnek de aranmalı — hiç tetiklenmediyse bu
+  kod yolu test edilmemiş demektir.
+- **YENİ maliyet notu:** #6 için `max_tokens: 4000` — ham çıktı, nihai
+  metinden çok daha uzun bir "Thinking Process" bloğu içeriyor, yani
+  gerçek token tüketimi kullanıcıya gösterilenden çok daha yüksek. Madde
+  18'deki kota hesaplaması SADECE çağrı SAYISINA bakıyordu; artık #3/#6
+  gerçekten çalıştığı için (fallback'e düşmüyor), bu iki noktanın ÇAĞRI
+  BAŞINA TOKEN HACMİ de kurumla paylaşılacak kota konuşmasına eklenmeli.
+
+## 25. Kutuplaşma Etkisi (Leave-One-Out) Rapor Performans Düzeltmesi
+
+- **Kök neden:** Yavaşlık, LLM'den değil, leave-one-out yönteminin N görüş
+  için N kere tam PCA+KMeans+kutuplaşma analizini baştan çalıştırmasından
+  kaynaklanıyor. LLM'in kaldırılması sadece bir yavaşlık kaynağını
+  çözmüştür, asıl maliyet (tekrarlanan tam analiz) hâlâ mevcuttur.
+- **Aday görüş sınırlaması (zorunlu, en yüksek öncelik):** Tüm onaylı
+  görüşler yerine, SADECE en yüksek contrastScore'a sahip ilk 15-20 görüş
+  için leave-one-out çalıştırılır. Düşük contrastScore'lu görüşlerin
+  kutuplaşmaya etkisi zaten ihmal edilebilir düzeydedir, bu sınırlama
+  matematiksel doğruluktan anlamlı ödün vermez.
+- **Asenkron/parçalı çalıştırma (zorunlu, sunucu kararlılığı için):**
+  Node.js tek iş parçacıklı olduğundan, N kere analiz senkron bir döngüde
+  çalıştırılırsa TÜM sunucu (diğer oturumlardaki katılımcılar dahil)
+  kilitlenebilir. Her leave-one-out iterasyonu arasında `setImmediate`
+  (veya benzeri) ile kontrol event loop'a geri bırakılmalı.
+- **İlerleme göstergesi:** Hesaplama sürerken kullanıcıya "Kutuplaşma etki
+  analizi hesaplanıyor..." gibi bir yüklenme göstergesi gösterilmeli, boş
+  ekran gösterilmemeli.
+- **Önbellekleme:** Aynı oturum için rapor tekrar açılırsa, oy sayısı/
+  içeriği değişmediği sürece (madde 18'deki imza mantığına benzer bir
+  yöntemle) hesaplama TEKRARLANMAZ, önceki sonuç kullanılır.
+- **İleri optimizasyon (opsiyonel, bu görevin kapsamı DIŞINDA):** PCA'yı
+  her iterasyonda yeniden hesaplamak yerine mevcut eksenleri kullanıp
+  sadece KMeans+kutuplaşmayı yeniden çalıştırmak — bu, madde 19'daki
+  matematiksel doğrulama testlerinin YENİDEN çalıştırılmasını gerektirir,
+  ayrı bir görev olarak ele alınmalı.
