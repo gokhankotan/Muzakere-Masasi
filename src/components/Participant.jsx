@@ -667,9 +667,9 @@ export default function Participant({
                                 fontWeight: 600
                               }}>
                                 {isAgree ? (
-                                  <>👍 {lang === 'tr' ? 'Katılıyorum' : 'Agreed'}</>
+                                  <>🟢 {lang === 'tr' ? 'Katılıyorum' : 'Agreed'}</>
                                 ) : (
-                                  <>👎 {lang === 'tr' ? 'Katılmıyorum' : 'Disagreed'}</>
+                                  <>🔴 {lang === 'tr' ? 'Katılmıyorum' : 'Disagreed'}</>
                                 )}
                               </span>
 
