@@ -1177,6 +1177,24 @@ io.on('connection', (socket) => {
     
     const session = db.getSessionSync(code);
     if (session) {
+      socket.emit('session-state', {
+        question: session.question,
+        status: session.status,
+        statements: session.statements,
+        analysis: session.analysis,
+        participantsCount: session.participants.filter(p => !p.isBanned).length,
+        visibility: session.visibility,
+        passwordText: session.passwordText
+      });
+
+      if (session.analysis) {
+        socket.emit('analysis-updated', {
+          analysis: session.analysis,
+          camps: session.analysis.camps,
+          targetK: session.targetK
+        });
+      }
+
       socket.emit('moderation-queue', session.moderationQueue);
       socket.emit('participants-list', session.participants.filter(p => !p.isBanned).map(p => ({ id: p.id, nickname: p.nickname, justification: p.justification, isBot: p.isBot })));
       sendAiAccuracy(code, socket);

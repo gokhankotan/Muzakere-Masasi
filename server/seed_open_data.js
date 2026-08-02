@@ -18,26 +18,42 @@ const DATASETS = [
   {
     code: 'BG2050',
     title: 'Bowling Green 2050 Vizyonu (CompDemocracy)',
-    description: 'Bowling Green 2050 Toplum Vizyonu ve Gönüllülük Katılım Oturumu (En Yüksek Katılımlı Açık Veri Seti #1)',
-    question: 'Bowling Green toplumunun 2050 vizyonunda öncelik verilmesi gereken ana alanlar ve yatırımlar neler olmalıdır?',
+    description: 'Bowling Green 2050 Toplum Vizyonu ve Gönüllülük Katılım Oturumu (En Yüksek Katılımlı Açık Veri Seti #1 - 7.886 Katılımcı)',
+    question: 'Bowling Green toplumunun 2050 vizyonunda öncelik verilmesi gereken ana alanlar ve kamu yatırımları neler olmalıdır?',
     commentsUrl: 'https://raw.githubusercontent.com/compdemocracy/openData/master/bg2050-volunteers/comments.csv',
     votesUrl: 'https://raw.githubusercontent.com/compdemocracy/openData/master/bg2050-volunteers/votes.csv'
   },
   {
     code: 'MARCHON',
     title: 'Operation Marching Orders (CompDemocracy)',
-    description: 'Vatandaş İnisiyatifi & Siyasi Öncelikler Kamusal Müzakeresi (En Yüksek Katılımlı Açık Veri Seti #2)',
-    question: 'Adayların ve toplumun odaklanması gereken en temel toplumsal ve siyasi öncelikler nelerdir?',
+    description: 'Vatandaş İnisiyatifi & Siyasi Öncelikler Kamusal Müzakeresi (En Yüksek Katılımlı Açık Veri Seti #2 - 6.289 Katılımcı)',
+    question: 'Adayların ve toplumun odaklanması gereken en temel toplumsal haklar ve siyasi öncelikler nelerdir?',
     commentsUrl: 'https://raw.githubusercontent.com/compdemocracy/openData/master/march-on.operation-marchin-orders/comments.csv',
     votesUrl: 'https://raw.githubusercontent.com/compdemocracy/openData/master/march-on.operation-marchin-orders/votes.csv'
   },
   {
     code: 'KLIMA22',
     title: 'Avusturya İklim Konseyi 2022 (CompDemocracy)',
-    description: 'Klimaticket & 2040 İklim Nötr Eylem Planı Müzakeresi (En Yüksek Katılımlı Açık Veri Seti #3)',
-    question: 'Avusturya genelinde 2040 iklim nötrlük hedefine ulaşmak için ulaşım, sanayi ve enerji alanında hangi önlemler alınmalıdır?',
+    description: 'Klimaticket & 2040 İklim Nötr Eylem Planı Müzakeresi (En Yüksek Katılımlı Açık Veri Seti #3 - 3.142 Katılımcı)',
+    question: 'Avusturya genelinde 2040 iklim nötrlük hedefine ulaşmak için ulaşım, sanayi ve enerji alanında hangi somut önlemler alınmalıdır?',
     commentsUrl: 'https://raw.githubusercontent.com/compdemocracy/openData/master/austria-climate.5tzfrp5eaa.2022-07-07/comments.csv',
     votesUrl: 'https://raw.githubusercontent.com/compdemocracy/openData/master/austria-climate.5tzfrp5eaa.2022-07-07/votes.csv'
+  },
+  {
+    code: 'AMASSEM',
+    title: 'American Assembly Kent Yönetimi (CompDemocracy)',
+    description: 'Kent Yönetimi & Yerel Altyapı Müzakere Oturumu (En Yüksek Katılımlı Açık Veri Seti #4 - 2.031 Katılımcı)',
+    question: 'Kent yönetimi, yerel altyapı ve kamu hizmetlerinin geliştirilmesinde toplumsal öncelikler neler olmalıdır?',
+    commentsUrl: 'https://raw.githubusercontent.com/compdemocracy/openData/master/american-assembly.bowling-green/comments.csv',
+    votesUrl: 'https://raw.githubusercontent.com/compdemocracy/openData/master/american-assembly.bowling-green/votes.csv'
+  },
+  {
+    code: 'VTAIWAN',
+    title: 'vTaiwan UberX Müzakeresi (CompDemocracy)',
+    description: 'vTaiwan Dijital Paylaşım Ekonomisi & Sürücü Düzenlemesi Müzakeresi (En Yüksek Katılımlı Açık Veri Seti #5 - 1.921 Katılımcı)',
+    question: 'UberX ve dijital yolcu taşıma hizmetlerinin düzenlenmesinde taksi esnafı, yolcular ve platformlar için adil kurallar nasıl olmalıdır?',
+    commentsUrl: 'https://raw.githubusercontent.com/compdemocracy/openData/master/vtaiwan.uberx/comments.csv',
+    votesUrl: 'https://raw.githubusercontent.com/compdemocracy/openData/master/vtaiwan.uberx/votes.csv'
   }
 ];
 

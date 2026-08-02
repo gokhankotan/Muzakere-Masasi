@@ -38,6 +38,7 @@ export default function App() {
   const [sessionsOverview, setSessionsOverview] = useState([]);
   const [lang, setLang] = useState(localStorage.getItem('muzakere_lang') || 'tr');
   const [theme, setTheme] = useState(localStorage.getItem('muzakere_theme') || 'light');
+  const [uiMode, setUiMode] = useState(localStorage.getItem('muzakere_ui_mode') || 'modern');
 
   useEffect(() => {
     if (theme === 'dark') {
@@ -48,8 +49,17 @@ export default function App() {
     localStorage.setItem('muzakere_theme', theme);
   }, [theme]);
 
+  useEffect(() => {
+    document.documentElement.setAttribute('data-ui-mode', uiMode);
+    localStorage.setItem('muzakere_ui_mode', uiMode);
+  }, [uiMode]);
+
   const toggleTheme = () => {
     setTheme(prev => prev === 'light' ? 'dark' : 'light');
+  };
+
+  const toggleUiMode = () => {
+    setUiMode(prev => prev === 'modern' ? 'classic' : 'modern');
   };
 
   useEffect(() => {
@@ -536,115 +546,127 @@ export default function App() {
     <div className="app-container">
       {/* Üst Menü / Navbar */}
       <header className="app-header no-print">
-        <div className="brand" onClick={() => setRole(participant ? 'participant' : 'lobby')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <span className="brand-icon">⚖️</span>
-          <div>
-            <div className="brand-title">{t('brandTitle', lang)}</div>
-            <div className="brand-subtitle">
-              {activeSessionCode !== 'DEFAULT' ? `CODE: ${activeSessionCode}` : t('brandSubtitle', lang)}
+        <div className="app-header-inner">
+          {/* 1. TOP-LEFT: Server Connection Status Indicator */}
+          <div className="header-left">
+            <span className={`status-badge ${isConnected ? 'status-connected' : 'status-disconnected'}`}>
+              {isConnected ? t('connConnected', lang) : t('connDisconnected', lang)}
+            </span>
+          </div>
+
+          {/* 2. CENTERED GROUP: Custom Swiss Geometric Deliberation Logo SVG + Title + Nav Tabs */}
+          <div className="header-center">
+            <div className="brand" onClick={() => setRole(participant ? 'participant' : 'lobby')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <svg className="brand-logo-svg" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+                <rect x="3" y="3" width="12" height="12" rx="3" fill="var(--color-secondary)" fillOpacity="0.9" />
+                <rect x="9" y="9" width="12" height="12" rx="3" fill="var(--text-main)" fillOpacity="0.85" stroke="var(--bg-main)" strokeWidth="1.5" />
+              </svg>
+              <div>
+                <div className="brand-title">{t('brandTitle', lang)}</div>
+                <div className="brand-subtitle">
+                  {activeSessionCode !== 'DEFAULT' ? `CODE: ${activeSessionCode}` : t('brandSubtitle', lang)}
+                </div>
+              </div>
             </div>
+
+            <nav className="nav-links" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <button 
+                onClick={() => setRole(participant ? 'participant' : 'lobby')} 
+                className={`nav-btn ${['lobby', 'participant'].includes(role) ? 'active' : ''}`}
+              >
+                <Users size={16} /> {t('navTable', lang)}
+              </button>
+              
+              {(participant || isAdminAuthenticated || isModerator) && (
+                <button 
+                  onClick={() => setRole('livescreen')} 
+                  className={`nav-btn ${role === 'livescreen' ? 'active' : ''}`}
+                >
+                  <Play size={16} /> {t('navLive', lang)}
+                </button>
+              )}
+
+              {/* Rapor Butonları (Admin veya Moderatör için) */}
+              {(isAdminAuthenticated || isModerator) && (
+                <>
+                  <button 
+                    onClick={() => setRole('report')} 
+                    className={`nav-btn ${role === 'report' ? 'active' : ''}`}
+                  >
+                    <BarChart3 size={16} /> {t('navReport', lang)}
+                  </button>
+                  <button 
+                    onClick={handleDownloadReport}
+                    className="nav-btn"
+                    title={t('navJsonReport', lang)}
+                  >
+                    <FileJson size={16} /> {t('navJsonReport', lang)}
+                  </button>
+                  <button 
+                    onClick={() => window.print()}
+                    className="nav-btn"
+                    title={t('navPrint', lang)}
+                  >
+                    <Printer size={16} /> {t('navPrint', lang)}
+                  </button>
+                </>
+              )}
+
+              {(isAdminAuthenticated || role !== 'participant') && (
+                <button 
+                  onClick={handleOpenAdminPanel} 
+                  className={`nav-btn ${role === 'admin' ? 'active' : ''}`}
+                >
+                  <Shield size={16} /> {t('navAdminPanel', lang)}
+                </button>
+              )}
+            </nav>
           </div>
-          <span className={`status-badge ${isConnected ? 'status-connected' : 'status-disconnected'}`} style={{ marginLeft: '1rem' }}>
-            {isConnected ? t('connConnected', lang) : t('connDisconnected', lang)}
-          </span>
+
+          {/* 3. TOP-RIGHT UTILITY CONTROLS: TR/EN + Theme Toggle + UI Selector */}
+          <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+            <div style={{ display: 'flex', gap: '0.2rem' }}>
+              <button 
+                onClick={() => handleToggleLang('tr')} 
+                className={`nav-btn ${lang === 'tr' ? 'active' : ''}`}
+                style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', minWidth: 'auto' }}
+              >
+                TR
+              </button>
+              <button 
+                onClick={() => handleToggleLang('en')} 
+                className={`nav-btn ${lang === 'en' ? 'active' : ''}`}
+                style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', minWidth: 'auto' }}
+              >
+                EN
+              </button>
+            </div>
+
+            {/* Tema Seçici */}
+            <button
+              onClick={toggleTheme}
+              className="nav-btn"
+              style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', minWidth: 'auto' }}
+              title={lang === 'tr' ? 'Temayı Değiştir' : 'Toggle Theme'}
+            >
+              {theme === 'light' ? '🌙 Koyu' : '☀️ Açık'}
+            </button>
+
+            {/* UI Modu Seçici (Swiss Bento vs Klasik) */}
+            <button
+              onClick={toggleUiMode}
+              className={`nav-btn ${uiMode === 'modern' ? 'active' : ''}`}
+              style={{
+                padding: '0.25rem 0.65rem',
+                fontSize: '0.75rem',
+                fontWeight: 600
+              }}
+              title={lang === 'tr' ? 'Tasarım Modunu Değiştir (Swiss Bento SaaS vs Klasik)' : 'Toggle UI Mode (Swiss Bento vs Classic)'}
+            >
+              {uiMode === 'modern' ? '✨ UI: Swiss Bento' : '🏛️ UI: Klasik'}
+            </button>
+          </div>
         </div>
-
-        <nav className="nav-links" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <button 
-            onClick={() => setRole(participant ? 'participant' : 'lobby')} 
-            className={`nav-btn ${['lobby', 'participant'].includes(role) ? 'active' : ''}`}
-          >
-            <Users size={16} /> {t('navTable', lang)}
-          </button>
-          
-          {(participant || isAdminAuthenticated || isModerator) && (
-            <button 
-              onClick={() => setRole('livescreen')} 
-              className={`nav-btn ${role === 'livescreen' ? 'active' : ''}`}
-            >
-              <Play size={16} /> {t('navLive', lang)}
-            </button>
-          )}
-
-          {/* Rapor Butonları (Admin veya Moderatör için) */}
-          {(isAdminAuthenticated || isModerator) && (
-            <>
-              <button 
-                onClick={() => setRole('report')} 
-                className={`nav-btn ${role === 'report' ? 'active' : ''}`}
-              >
-                <BarChart3 size={16} /> {t('navReport', lang)}
-              </button>
-              <button 
-                onClick={handleDownloadReport}
-                className="nav-btn"
-                title={t('navJsonReport', lang)}
-              >
-                <FileJson size={16} /> {t('navJsonReport', lang)}
-              </button>
-              <button 
-                onClick={() => window.print()}
-                className="nav-btn"
-                title={t('navPrint', lang)}
-              >
-                <Printer size={16} /> {t('navPrint', lang)}
-              </button>
-            </>
-          )}
-
-          {(isAdminAuthenticated || role !== 'participant') && (
-            <button 
-              onClick={handleOpenAdminPanel} 
-              className={`nav-btn ${role === 'admin' ? 'active' : ''}`}
-            >
-              <Shield size={16} /> {t('navAdminPanel', lang)}
-            </button>
-          )}
-
-          {/* Dil Değiştirici Butonları */}
-          <div style={{ display: 'flex', gap: '0.25rem', borderLeft: '1px solid var(--border-light)', paddingLeft: '1rem', marginLeft: '0.5rem' }}>
-            <button 
-              onClick={() => handleToggleLang('tr')} 
-              className={`nav-btn`} 
-              style={{
-                padding: '0.25rem 0.5rem',
-                fontSize: '0.75rem',
-                border: lang === 'tr' ? '2px solid #ffffff' : '1px solid rgba(255,255,255,0.2)',
-                background: lang === 'tr' ? 'rgba(255,255,255,0.2)' : 'transparent',
-                color: '#ffffff',
-                minWidth: 'auto',
-                opacity: lang === 'tr' ? 1 : 0.6
-              }}
-            >
-              TR
-            </button>
-            <button 
-              onClick={() => handleToggleLang('en')} 
-              className={`nav-btn`} 
-              style={{
-                padding: '0.25rem 0.5rem',
-                fontSize: '0.75rem',
-                border: lang === 'en' ? '2px solid #ffffff' : '1px solid rgba(255,255,255,0.2)',
-                background: lang === 'en' ? 'rgba(255,255,255,0.2)' : 'transparent',
-                color: '#ffffff',
-                minWidth: 'auto',
-                opacity: lang === 'en' ? 1 : 0.6
-              }}
-            >
-              EN
-            </button>
-          </div>
-
-          {/* Tema Seçici */}
-          <button
-            onClick={toggleTheme}
-            className="nav-btn"
-            style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', marginLeft: '0.5rem', minWidth: 'auto', background: 'transparent', borderColor: 'rgba(255,255,255,0.2)', color: '#ffffff' }}
-            title={lang === 'tr' ? 'Temayı Değiştir' : 'Toggle Theme'}
-          >
-            {theme === 'light' ? '🌙 Koyu' : '☀️ Açık'}
-          </button>
-        </nav>
       </header>
 
       {/* Ana İçerik Alanı */}

@@ -422,7 +422,7 @@ export default function AdminDashboard({
       </div>
 
       <div className="admin-layout">
-      {/* Sol Panel: Oturum ve Simülasyon Ayarları */}
+      {/* Sol Panel: Oturum, AI Keşif, Kümeleme ve Simülasyon Ayarları */}
       <div className="admin-left-col" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
         
         {/* Masa Durumu Kontrolü */}
@@ -511,30 +511,7 @@ export default function AdminDashboard({
           </button>
         </div>
 
-        {/* Müzakere Sorusu Ayarı */}
-        <div className="glass-panel">
-          <h2 style={{ fontSize: '1.25rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Settings size={18} className="text-secondary" />
-            {t('adminQuestionTitle', lang)}
-          </h2>
-          <form onSubmit={handleUpdateQuestion} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div className="form-group">
-              <label className="form-label">{t('adminQuestionFormLabel', lang)}</label>
-              <textarea 
-                className="form-input" 
-                rows={3}
-                value={newQuestion}
-                onChange={(e) => setNewQuestion(e.target.value)}
-                required
-              />
-            </div>
-            <button type="submit" className="btn btn-secondary">
-              {t('adminQuestionUpdateBtn', lang)}
-            </button>
-          </form>
-        </div>
-
-        {/* Fikir Kümeleme ve Kamp Ayarları */}
+        {/* Fikir Kümeleme ve Kamp Ayarları (Tallest Card) */}
         <div className="glass-panel">
           <h2 style={{ fontSize: '1.25rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <Settings size={18} className="text-secondary" />
@@ -553,7 +530,7 @@ export default function AdminDashboard({
             </label>
             <select
               className="form-input"
-               value={targetK}
+              value={targetK}
               onChange={(e) => onUpdateCampsCount(parseInt(e.target.value, 10))}
               style={{ background: 'var(--bg-card)', color: 'var(--text-main)', fontSize: '0.85rem', padding: '0.5rem' }}
             >
@@ -603,20 +580,20 @@ export default function AdminDashboard({
                           <button 
                             onClick={() => handleSaveCampName(camp.id)}
                             className="btn btn-agree"
-                            style={{ padding: '0.35rem 0.65rem', fontSize: '0.78rem' }}
+                            style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }}
                           >
                             {lang === 'tr' ? 'Kaydet' : 'Save'}
                           </button>
                           <button 
                             onClick={() => { setEditingCampId(null); setEditingCampName(''); }}
-                            className="btn btn-secondary"
-                            style={{ padding: '0.35rem 0.65rem', fontSize: '0.78rem', border: '1px solid var(--border-light)' }}
+                            className="btn btn-pass"
+                            style={{ padding: '0.35rem 0.5rem', fontSize: '0.8rem' }}
                           >
-                            {lang === 'tr' ? 'İptal' : 'Cancel'}
+                            ✕
                           </button>
                         </div>
                       ) : (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <span style={{ fontSize: '0.85rem', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             "{camp.name}"
                           </span>
@@ -647,7 +624,7 @@ export default function AdminDashboard({
             <Users size={18} className="text-secondary" />
             {t('adminSimTitle', lang)}
           </h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1rem' }}>
             {t('adminSimDesc', lang)}
           </p>
 
@@ -678,8 +655,121 @@ export default function AdminDashboard({
             </div>
           )}
         </div>
+      </div>
 
-        {/* Aktif Katılımcılar Listesi */}
+      {/* Sağ Panel: Moderasyon Kuyruğu, Soru Ayarı, Katılımcılar ve Sıfırlama */}
+      <div className="admin-right-col" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+        
+        {/* 1. TOP CARD: Görüş Moderasyon Kuyruğu */}
+        <div className="glass-panel">
+          <h2 style={{ fontSize: '1.25rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Shield size={18} className="text-secondary" />
+            {t('adminQueueTitle', lang)} ({moderationQueue.length})
+          </h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1rem' }}>
+            {t('adminQueueDesc', lang)}
+          </p>
+
+          {aiAccuracy !== undefined && (
+            <div style={{
+              marginBottom: '1.25rem',
+              padding: '0.6rem 0.85rem',
+              background: 'rgba(59, 130, 246, 0.15)',
+              border: '1px solid rgba(59, 130, 246, 0.3)',
+              borderRadius: 'var(--radius-md)',
+              fontSize: '0.85rem',
+              color: '#93c5fd',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}>
+              🎯 <strong>{lang === 'tr' 
+                ? `AI Moderasyon Doğruluğu: %${aiAccuracy} doğru alarm` 
+                : `AI Moderation Accuracy: ${aiAccuracy}% true alert`}</strong>
+            </div>
+          )}
+
+          <div style={{ maxHeight: '420px', overflowY: 'auto', paddingRight: '0.5rem' }}>
+            {moderationQueue.length > 0 ? (
+              moderationQueue.map((item) => (
+                <div key={item.id} className="moderation-item">
+                  <div style={{ fontSize: '1.05rem', fontWeight: 500, lineHeight: 1.4 }}>
+                    "{item.text}"
+                  </div>
+
+                  {item.aiWarning && (
+                    <div style={{
+                      marginTop: '0.5rem',
+                      padding: '0.5rem 0.75rem',
+                      background: 'rgba(239, 68, 68, 0.15)',
+                      border: '1px solid rgba(239, 68, 68, 0.3)',
+                      borderRadius: '6px',
+                      fontSize: '0.8rem',
+                      color: '#f87171',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.4rem'
+                    }}>
+                      <span>{t('adminAiWarningLabel', lang)}</span>
+                      <strong>{item.aiWarning}</strong>
+                    </div>
+                  )}
+
+                  <div className="moderation-meta">
+                    <span>{lang === 'tr' ? 'Yazan' : 'Author'}: <strong>{item.author}</strong></span>
+                    <span>{new Date(item.timestamp).toLocaleTimeString()}</span>
+                  </div>
+                  <div className="moderation-actions">
+                    <button 
+                      onClick={() => onApproveStatement(item.id)} 
+                      className="btn btn-agree" 
+                      style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
+                    >
+                      {t('adminApprove', lang)}
+                    </button>
+                    <button 
+                      onClick={() => onRejectStatement(item.id)} 
+                      className="btn btn-disagree" 
+                      style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
+                    >
+                      {t('adminReject', lang)}
+                    </button>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="empty-state" style={{ padding: '2rem 1rem' }}>
+                <div className="empty-state-icon">🛡️</div>
+                <p>{t('adminQueueEmpty', lang)}</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 2. CARD BELOW MODERATION QUEUE: Müzakere Masası Konusu (Question Editor) */}
+        <div className="glass-panel">
+          <h2 style={{ fontSize: '1.25rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Settings size={18} className="text-secondary" />
+            {t('adminQuestionTitle', lang)}
+          </h2>
+          <form onSubmit={handleUpdateQuestion} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div className="form-group">
+              <label className="form-label">{t('adminQuestionFormLabel', lang)}</label>
+              <textarea 
+                className="form-input" 
+                rows={3}
+                value={newQuestion}
+                onChange={(e) => setNewQuestion(e.target.value)}
+                required
+              />
+            </div>
+            <button type="submit" className="btn btn-secondary">
+              {t('adminQuestionUpdateBtn', lang)}
+            </button>
+          </form>
+        </div>
+
+        {/* 3. Aktif Katılımcılar Listesi */}
         <div className="glass-panel">
           <h2 style={{ fontSize: '1.25rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <Users size={18} className="text-secondary" />
@@ -725,7 +815,7 @@ export default function AdminDashboard({
           </div>
         </div>
 
-        {/* Sıfırlama */}
+        {/* 4. Sıfırlama / Tehlikeli Bölge */}
         <div className="glass-panel" style={{ border: '1px solid rgba(239, 68, 68, 0.3)' }}>
           <h2 style={{ fontSize: '1.25rem', color: 'var(--color-disagree)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <AlertTriangle size={18} />
@@ -753,97 +843,7 @@ export default function AdminDashboard({
           )}
         </div>
       </div>
-
-      {/* Sağ Panel: Moderasyon Kuyruğu */}
-      <div className="admin-right-col glass-panel" style={{ display: 'flex', flexDirection: 'column', height: 'fit-content' }}>
-        <h2 style={{ fontSize: '1.25rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <Shield size={18} className="text-secondary" />
-          {t('adminQueueTitle', lang)} ({moderationQueue.length})
-        </h2>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1rem' }}>
-          {t('adminQueueDesc', lang)}
-        </p>
-
-        {aiAccuracy !== undefined && (
-          <div style={{
-            marginBottom: '1.25rem',
-            padding: '0.6rem 0.85rem',
-            background: 'rgba(59, 130, 246, 0.15)',
-            border: '1px solid rgba(59, 130, 246, 0.3)',
-            borderRadius: 'var(--radius-md)',
-            fontSize: '0.85rem',
-            color: '#93c5fd',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}>
-            🎯 <strong>{lang === 'tr' 
-              ? `AI Moderasyon Doğruluğu: %${aiAccuracy} doğru alarm` 
-              : `AI Moderation Accuracy: ${aiAccuracy}% true alert`}</strong>
-          </div>
-        )}
-
-        <div style={{ maxHeight: '550px', overflowY: 'auto', paddingRight: '0.5rem' }}>
-          {moderationQueue.length > 0 ? (
-            moderationQueue.map((item) => (
-              <div key={item.id} className="moderation-item">
-                <div style={{ fontSize: '1.05rem', fontWeight: 500, lineHeight: 1.4 }}>
-                  "{item.text}"
-                </div>
-
-                {item.aiWarning && (
-                  <div style={{
-                    marginTop: '0.5rem',
-                    padding: '0.5rem 0.75rem',
-                    background: 'rgba(239, 68, 68, 0.15)',
-                    border: '1px solid rgba(239, 68, 68, 0.3)',
-                    borderRadius: '6px',
-                    fontSize: '0.8rem',
-                    color: '#f87171',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.4rem'
-                  }}>
-                    <span>{t('adminAiWarningLabel', lang)}</span>
-                    <strong>{item.aiWarning}</strong>
-                  </div>
-                )}
-
-                <div className="moderation-meta">
-                  <span>{lang === 'tr' ? 'Yazan' : 'Author'}: <strong>{item.author}</strong></span>
-                  <span>{new Date(item.timestamp).toLocaleTimeString()}</span>
-                </div>
-                <div className="moderation-actions">
-                  <button 
-                    onClick={() => onApproveStatement(item.id)} 
-                    className="btn btn-agree" 
-                    style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
-                  >
-                    <Check size={14} /> {t('adminQueueApproveBtn', lang)}
-                  </button>
-                  <button 
-                    onClick={() => onRejectStatement(item.id)} 
-                    className="btn btn-disagree" 
-                    style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
-                  >
-                    <X size={14} /> {t('adminQueueRejectBtn', lang)}
-                  </button>
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="empty-state" style={{ padding: '4rem 1rem' }}>
-              <div className="empty-state-icon">🛡️</div>
-              <p>{t('adminQueueEmpty', lang)}</p>
-            </div>
-          )}
-        </div>
-      </div>
     </div>
-
-
-
-
-    </div>
+  </div>
   );
 }

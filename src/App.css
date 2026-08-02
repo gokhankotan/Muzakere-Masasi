@@ -105,10 +105,37 @@ h1, h2, h3, h4, h5, h6 {
   position: sticky;
   top: 0;
   z-index: 100;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
   box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+}
+
+.app-header-inner {
+  max-width: 1600px;
+  margin: 0 auto;
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 1rem;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.header-center {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  justify-content: center;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  justify-content: flex-end;
 }
 
 .brand {
@@ -285,19 +312,14 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Lobi Ekranı */
 .lobby-layout {
-  display: grid;
-  grid-template-columns: 1.2fr 0.8fr;
-  gap: 2rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: calc(100vh - 120px);
   padding: 2rem;
   max-width: 1200px;
-  margin: 2rem auto;
-}
-
-@media (max-width: 768px) {
-  .lobby-layout {
-    grid-template-columns: 1fr;
-    padding: 1rem;
-  }
+  margin: 0 auto;
+  width: 100%;
 }
 
 .lobby-intro h1 {
@@ -1147,4 +1169,259 @@ h1, h2, h3, h4, h5, h6 {
   text-align: center;
   font-size: 0.8rem;
   color: var(--text-muted);
+}
+
+/* ==========================================================================
+   SWISS INTERNATIONAL GRID + BENTO MODULARITY (LIGHT & DARK THEME SUPPORT)
+   ========================================================================== */
+
+/* 1. LIGHT THEME TOKENS (Default) */
+[data-ui-mode="modern"] {
+  --bg-main: #fafafa;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f4f4f5;
+  
+  --border-light: #e4e4e7;
+  --border-glow: rgba(15, 23, 42, 0.08);
+
+  --color-primary: #0f172a;
+  --color-secondary: #2563eb;
+  
+  --color-agree: #047857;
+  --color-agree-bg: #ffffff;
+  --color-agree-hover: #ecfdf5;
+  --color-agree-border: #10b981;
+
+  --color-disagree: #b91c1c;
+  --color-disagree-bg: #ffffff;
+  --color-disagree-hover: #fef2f2;
+  --color-disagree-border: #ef4444;
+
+  --color-pass: #3f3f46;
+  --color-pass-bg: #ffffff;
+  --color-pass-hover: #f4f4f5;
+  --color-pass-border: #a1a1aa;
+
+  --text-main: #0f172a;
+  --text-muted: #71717a;
+  --text-dark: #000000;
+  --color-primary-text: #0f172a;
+
+  --bridge-bg: #ffffff;
+  --bridge-border: #0f172a;
+  --bridge-text: #0f172a;
+  --bridge-badge-bg: #0f172a;
+  --bridge-badge-text: #ffffff;
+  --bridge-shadow: #0f172a;
+
+  --header-bg: #ffffff;
+  --header-border: #e4e4e7;
+  --header-title: #0f172a;
+  --nav-btn-bg: #f4f4f5;
+  --nav-btn-border: #e4e4e7;
+  --nav-btn-text: #27272a;
+
+  --shadow-premium: 0 1px 3px 0 rgba(0, 0, 0, 0.02), 0 1px 2px -1px rgba(0, 0, 0, 0.02);
+  --radius-lg: 14px;
+  --radius-md: 8px;
+}
+
+/* 2. DARK THEME TOKENS */
+body.dark-theme [data-ui-mode="modern"],
+[data-ui-mode="modern"].dark-theme,
+[data-ui-mode="modern"] body.dark-theme,
+.dark-theme[data-ui-mode="modern"] {
+  --bg-main: #090d16;
+  --bg-card: #111827;
+  --bg-card-hover: #1f2937;
+  
+  --border-light: #1f2937;
+  --border-glow: rgba(59, 130, 246, 0.2);
+
+  --color-primary: #f8fafc;
+  --color-secondary: #3b82f6;
+  
+  --color-agree: #34d399;
+  --color-agree-bg: #064e3b;
+  --color-agree-hover: #047857;
+  --color-agree-border: #10b981;
+
+  --color-disagree: #f87171;
+  --color-disagree-bg: #7f1d1d;
+  --color-disagree-hover: #b91c1c;
+  --color-disagree-border: #ef4444;
+
+  --color-pass: #e4e4e7;
+  --color-pass-bg: #27272a;
+  --color-pass-hover: #3f3f46;
+  --color-pass-border: #71717a;
+
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --text-dark: #ffffff;
+  --color-primary-text: #f8fafc;
+
+  --bridge-bg: #1e293b;
+  --bridge-border: #38bdf8;
+  --bridge-text: #f8fafc;
+  --bridge-badge-bg: #38bdf8;
+  --bridge-badge-text: #0f172a;
+  --bridge-shadow: #0284c7;
+
+  --header-bg: #111827;
+  --header-border: #1f2937;
+  --header-title: #ffffff;
+  --nav-btn-bg: #1f2937;
+  --nav-btn-border: #374151;
+  --nav-btn-text: #e2e8f0;
+
+  --shadow-premium: 0 4px 20px -2px rgba(0, 0, 0, 0.4);
+}
+
+[data-ui-mode="modern"] body,
+body.dark-theme [data-ui-mode="modern"] body {
+  background-color: var(--bg-main);
+  color: var(--text-main);
+}
+
+/* Swiss App Header */
+[data-ui-mode="modern"] .app-header {
+  background: var(--header-bg);
+  border-bottom: 1px solid var(--header-border);
+  box-shadow: none;
+  padding: 0.75rem 2rem;
+}
+
+[data-ui-mode="modern"] .brand-title {
+  color: var(--header-title);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+}
+
+[data-ui-mode="modern"] .brand-subtitle {
+  color: var(--text-muted);
+  letter-spacing: 0.08em;
+  font-weight: 600;
+}
+
+[data-ui-mode="modern"] .nav-btn {
+  background: var(--nav-btn-bg);
+  border: 1px solid var(--nav-btn-border);
+  color: var(--nav-btn-text);
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.4rem 0.85rem;
+  transition: all 0.15s ease;
+}
+
+[data-ui-mode="modern"] .nav-btn:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-main);
+}
+
+[data-ui-mode="modern"] .nav-btn.active {
+  background: var(--color-secondary);
+  border-color: var(--color-secondary);
+  color: #ffffff;
+}
+
+/* Neutral Voting Buttons (Habermas Neutrality - Adaptable for Light & Dark) */
+[data-ui-mode="modern"] .btn-agree {
+  background: var(--color-agree-bg) !important;
+  border: 1.5px solid var(--color-agree-border) !important;
+  color: var(--color-agree) !important;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+}
+[data-ui-mode="modern"] .btn-agree:hover {
+  background: var(--color-agree-hover) !important;
+  color: #ffffff !important;
+  transform: translateY(-1px);
+}
+
+[data-ui-mode="modern"] .btn-disagree {
+  background: var(--color-disagree-bg) !important;
+  border: 1.5px solid var(--color-disagree-border) !important;
+  color: var(--color-disagree) !important;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+}
+[data-ui-mode="modern"] .btn-disagree:hover {
+  background: var(--color-disagree-hover) !important;
+  color: #ffffff !important;
+  transform: translateY(-1px);
+}
+
+[data-ui-mode="modern"] .btn-pass {
+  background: var(--color-pass-bg) !important;
+  border: 1.5px solid var(--color-pass-border) !important;
+  color: var(--color-pass) !important;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+}
+[data-ui-mode="modern"] .btn-pass:hover {
+  background: var(--color-pass-hover) !important;
+  color: var(--text-main) !important;
+  transform: translateY(-1px);
+}
+
+/* Neo-Brutalist Bridge Statement Accent Component */
+.bridge-accent-card {
+  background: var(--bridge-bg);
+  border: 2.5px solid var(--bridge-border);
+  border-left: 8px solid var(--color-secondary);
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 4px 4px 0px var(--bridge-shadow);
+  margin-bottom: 1.25rem;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.bridge-accent-card:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 6px 6px 0px var(--bridge-shadow);
+}
+
+.bridge-accent-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--bridge-badge-bg);
+  color: var(--bridge-badge-text);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.3rem 0.75rem;
+  border-radius: 4px;
+  margin-bottom: 0.75rem;
+}
+
+.bridge-accent-text {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--bridge-text);
+  line-height: 1.45;
+  letter-spacing: -0.02em;
+}
+
+/* Swiss Bento Grid & Card System */
+[data-ui-mode="modern"] .swiss-card,
+[data-ui-mode="modern"] .glass-panel,
+[data-ui-mode="modern"] .bento-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  color: var(--text-main);
+  border-radius: 14px;
+  padding: 1.5rem;
+  box-shadow: var(--shadow-premium);
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+[data-ui-mode="modern"] .form-input,
+[data-ui-mode="modern"] .form-textarea {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  color: var(--text-main);
 }

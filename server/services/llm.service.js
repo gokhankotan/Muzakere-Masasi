@@ -520,13 +520,38 @@ export function generatePolarizationImpactDescription(impact) {
  * @param {string} question - Müzakere ana sorusu
  * @returns {Promise<string>}
  */
+function generateRuleBasedConsensusFallback(camps, question) {
+  if (!camps || camps.length === 0) {
+    return `"${question || 'Bu müzakere'}" konusundaki oturumda henüz belirgin bir fikir grubu oluşmamıştır. Katılımcı sayısı arttıkça uzlaşı potansiyelleri analiz edilecektir.`;
+  }
+
+  const campNames = camps.map(c => `"${c.name || ('Grup ' + String.fromCharCode(65 + c.id))}"`).join(' ve ');
+  const topOpinions = camps
+    .flatMap(c => (c.topStatements || []).slice(0, 1))
+    .map(st => st.text || st.statement?.text)
+    .filter(Boolean);
+
+  let opinionContext = '';
+  if (topOpinions.length > 0) {
+    opinionContext = `Öne çıkan görüşlerde "${topOpinions[0]}" gibi başlıkların ağırlık kazanması, gruplar arasında diyalog zemininin bulunduğunu göstermektedir. `;
+  }
+
+  return `"${question}" konusundaki müzakerede ${camps.length} ana fikir grubu (${campNames}) arasında yapılan analiz sonucunda, temel beklentilerin ortak fayda ve yapıcı çözümler etrafında odaklandığı gözlemlenmektedir. ${opinionContext}Moderatör olarak bu ortak temada yeni bir odak sorusu açarak gruplar arası diyaloğu teşvik edebilirsiniz.`;
+}
+
+/**
+ * Gruplar arası ortak uzlaşı alanlarını ve köprü temaları keşfeder.
+ * @param {Array} camps - Fikir grupları dizisi
+ * @param {string} question - Müzakere ana sorusu
+ * @returns {Promise<string>}
+ */
 export async function discoverConsensusPotential(camps, question) {
   if (process.env.LLM_DRY_RUN === 'true') {
     logDryRunCall('consensus-discovery');
     return `[DRY-RUN] Ortak Uzlaşı Potansiyeli Özeti ve Süreç Önerisi`;
   }
 
-  const fallbackConsensus = `Müzakere sürecinde grupların öne çıkan fikirleri incelendiğinde, temel ortak kaygıların şehir altyapısının geliştirilmesi ve erişilebilirliğin artırılması etrafında toplandığı gözlemlenmektedir. Moderatör olarak bu ortak temada yeni bir odak sorusu açarak gruplar arası diyaloğu teşvik edebilirsiniz.`;
+  const fallbackConsensus = generateRuleBasedConsensusFallback(camps, question);
 
   if (!openaiClient) {
     return fallbackConsensus;

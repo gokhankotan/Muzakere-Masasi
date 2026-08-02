@@ -109,38 +109,21 @@ export default function Lobby({ question, onJoin, participantsCount, lang = 'tr'
   };
 
   return (
-    <div className="lobby-layout">
-      {/* Sol Panel: Giriş ve Fikir */}
-      <div className="lobby-intro">
-        <h1>{t('lobbyWelcome', lang)}</h1>
-        <p>{t('lobbyIntro', lang)}</p>
-
-        <div className="concept-card-grid">
-          <div className="concept-card">
-            <div className="concept-card-icon">⚖️</div>
-            <div className="concept-card-title">{t('lobbyConceptEqual', lang)}</div>
-            <div className="concept-card-desc">{t('lobbyConceptEqualDesc', lang)}</div>
-          </div>
-          <div className="concept-card">
-            <div className="concept-card-icon">🧠</div>
-            <div className="concept-card-title">{t('lobbyConceptJustify', lang)}</div>
-            <div className="concept-card-desc">{t('lobbyConceptJustifyDesc', lang)}</div>
-          </div>
-          <div className="concept-card">
-            <div className="concept-card-icon">🤝</div>
-            <div className="concept-card-title">{t('lobbyConceptSincerity', lang)}</div>
-            <div className="concept-card-desc">{t('lobbyConceptSincerityDesc', lang)}</div>
-          </div>
-        </div>
-
-        <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '1rem' }}>
-          <Award size={18} className="text-secondary" />
-          <span>{lang === 'tr' ? `Şu anda aktif oturumlarda ` : `Currently `}<strong>{participantsCount || 0}</strong>{lang === 'tr' ? ` katılımcı bulunuyor.` : ` active participants in deliberation.`}</span>
-        </div>
+    <div className="lobby-layout" style={{ flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+      {/* Welcome Heading Block */}
+      <div style={{ textAlign: 'center', marginBottom: '1.75rem', maxWidth: '520px' }}>
+        <h1 style={{ fontSize: '1.85rem', fontWeight: 800, letterSpacing: '-0.03em', color: 'var(--text-main)', marginBottom: '0.4rem' }}>
+          {lang === 'tr' ? 'Müzakere Masası\'na Hoş Geldiniz' : 'Welcome to Deliberation Table'}
+        </h1>
+        <p style={{ fontSize: '0.92rem', color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>
+          {lang === 'tr' 
+            ? 'Kamusal müzakereye katılmak için bir masaya giriş yapın veya yeni bir müzakere başlatın.' 
+            : 'Join an active deliberation table or create a new consultation session.'}
+        </p>
       </div>
 
-      {/* Sağ Panel: Giriş / Masa Oluşturma Sekmeleri */}
-      <div className="glass-panel" style={{ height: 'fit-content', width: '100%', maxWidth: '480px' }}>
+      {/* Giriş / Masa Oluşturma Sekmeleri */}
+      <div className="glass-panel" style={{ height: 'fit-content', width: '100%', maxWidth: '480px', margin: '0 auto' }}>
         
         {/* Sekme Butonları */}
         <div style={{ display: 'flex', borderBottom: '1px solid var(--border-light)', marginBottom: '1.5rem' }}>

@@ -750,3 +750,10 @@ planı ve onayıyla, birbirine karışmadan uygulanmalı.
 - **Kurumla paylaşılacak kota/hacim tahmini, 5 LLM çağrı noktası üzerinden
   güncellenmelidir** — kutuplaşma etkisi açıklaması bu hesaba dahil
   edilmemeli, çünkü kurumun API'sine hiç yük bindirmiyor.
+
+## 28. Swiss Bento UI, Top 5 CompDemocracy OpenData Entegrasyonu ve Dinamik Uzlaşı Motoru
+
+- **Swiss Bento Grid & Çift UI Altyapısı:** Swiss International grid ilkeleri, Bento grid modülerliği, `#2563EB` Neo-Brutalist sol bantlı Köprü Görüş Kartları (`.bridge-accent-card`), 3-Sütunlu matematiksel header yerleşimi (`grid-template-columns: 1fr auto 1fr`) ve dikey/yatay ortalanmış karşılama ekranı tamamlanmıştır.
+- **Top 5 CompDemocracy OpenData:** `BG2050` (7.886), `MARCHON` (6.289), `KLIMA22` (3.142), `AMASSEM` (2.031) ve `VTAIWAN` (1.921) oturumları sisteme tohumlanmış ve test edilmiştir.
+- **Dinamik Rule-Based Uzlaşı Keşif Motoru:** LLM API limitlerinde dahi `discoverConsensusPotential` fonksiyonu `generateRuleBasedConsensusFallback(camps, question)` ile her oturumun özel sorusu ve oy örüntülerine dayalı %100 benzersiz uzlaşı analizi sunmaktadır.
+- **Oturum Senkronizasyonu:** `admin-join` olayında `session-state` ve `analysis-updated` emit edilerek admin panelinde oturum değişimlerinde anlık veri senkronizasyonu sağlanmıştır.

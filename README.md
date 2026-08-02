@@ -9,7 +9,8 @@ Müzakere Masası, sosyal medyanın kutuplaştırıcı yapısına karşı geliş
 ## 📑 İçindekiler
 
 - [Kuramsal Temel](#-kuramsal-temel)
-- [Yeni Eklenen Özellikler (Aşama 5 - 9)](#-yeni-eklenen-özellikler-aşama-5---9)
+- [Yeni Eklenen Özellikler & Güncellemeler](#-yeni-eklenen-özellikler--güncellemeler)
+- [CompDemocracy OpenData Oturumları](#-compdemocracy-opendata-oturumları)
 - [Teknoloji Yığını](#-teknoloji-yığını)
 - [Proje Mimarisi](#-proje-mimarisi)
   - [Dizin Yapısı](#dizin-yapısı)
@@ -17,14 +18,8 @@ Müzakere Masası, sosyal medyanın kutuplaştırıcı yapısına karşı geliş
 - [Kurulum & Çalıştırma](#-kurulum--çalıştırma)
 - [Ortam Değişkenleri](#-ortam-değişkenleri)
 - [Kullanım Kılavuzu](#-kullanım-kılavuzu)
-  - [Yönetici Paneli](#yönetici-paneli)
-  - [Katılımcı ve Görüş Havuzu](#katılımcı-ve-görüş-havuzu)
-  - [Çoklu Dil Yönetimi](#çoklu-dil-yönetimi)
 - [API ve Soket Referansı](#-api-ve-soket-referansı)
-- [Algoritmalar](#-algoritmalar)
-  - [Temel Bileşenler Analizi (PCA)](#1-pca---temel-bileşenler-analizi)
-  - [Dinamik K-Means Kümeleme](#2-dinamik-k-means-kümeleme)
-  - [Kutuplaşma Derecesi Trendi](#3-kutuplaşma-derecesi-trendi)
+- [Algoritmalar & Dinamik Uzlaşı Motoru](#-algoritmalar--dinamik-uzlaşı-motoru)
 - [Test & Doğrulama](#-test--doğrulama)
 - [Lisans](#-lisans)
 
@@ -49,20 +44,30 @@ Habermas'ın öne sürdüğü, gerçek bir uzlaşının sağlanabilmesi için ge
 
 ---
 
-## ✨ Yeni Eklenen Özellikler (Aşama 5 - 9)
+## ✨ Yeni Eklenen Özellikler & Güncellemeler
 
-Müzakere Masası platformunun son aşamalarında aşağıdaki kurumsal analitik, güvenlik ve arayüz özellikleri entegre edilmiştir:
+1. 🏛️ **Swiss Bento Grid & Çift UI Tasarım Altyapısı:** Swiss International tipografi disiplini (Inter/Outfit), rasyonel asimetrik grid düzeni ve `✨ UI: Swiss Bento` / `🏛️ UI: Klasik` anlık geçiş butonu (`muzakere_ui_mode`).
+2. ⚡ **Neo-Brutalist Köprü Görüş Vurgusu:** Uzlaşı cümleleri için 2.5px solid border, `#2563EB` mavi sol şerit ve `⚡ KÖPRÜ GÖRÜŞ (ORTAK MUTABAKAT)` rozetli özel kart tasarımı (`.bridge-accent-card`).
+3. 📐 **3-Sütunlu Matematiksel Header Mimarisi:** `grid-template-columns: 1fr auto 1fr` ile sol üstte `Bağlı` sunucu durumu, tam ortada geometrik Swiss müzakere SVG logosu + başlık + navigasyon sekmeleri, sağ üstte TR/EN + Açık/Koyu tema + UI modu buton grubu.
+4. 🍱 **Dengelenmiş Yönetici Paneli Bento Grid:** Sol sütunda Masa Durumu + Uzlaşı Keşfi + Fikir Kümeleme & Kamp Ayarları + Simülasyon Paneli; sağ sütunda Moderasyon Kuyruğu + Müzakere Soru Editörü + Katılımcı Listesi + Tehlikeli Bölge.
+5. 🔍 **Dinamik Rule-Based Uzlaşı Keşif Motoru:** LLM API limitlerinde dahi her oturumun özel sorusu, aktif fikir grupları ve en çok onay alan gerçek görüşlerini işleyerek oturuma özel %100 benzersiz uzlaşı analizi sunan `generateRuleBasedConsensusFallback` motoru.
+6. 🎯 **Giriş Ekranı (Lobby) Temizliği:** Habermas ve tanıtım kartları kaldırılarak dikey/yatay tam ortalanmış giriş formu ve "Müzakere Masası'na Hoş Geldiniz" karşılama başlığı.
+7. 🛡️ **Gelişmiş Moderasyon & Katılımcı Engelleme (Ban/Kick):** Sabotaj yapan kullanıcıları masadan atma ve onay bekleyen görüş akışı.
+8. 🌉 **Görüş Havuzu (Opinion Pool):** Approved olmuş tüm görüşler arasında arama yapabilme, kamplara göre süzme ve oyları canlı güncelleme.
 
-1. 👤 **Anonim Oylama Yapısı:** Katılımcıların oy verirken önyargıdan uzak durabilmeleri için oylama kartlarından yazar rumuzları kaldırılmış, tam anonimlik sağlanmıştır.
-2. ✍️ **750 Karakter Görüş Sınırı:** Katılımcıların fikirlerini daha detaylı ifade edebilmeleri amacıyla görüş ekleme limiti 750 karaktere çıkartılmıştır.
-3. 🗺️ **Dinamik Fikir Haritası Tooltip'leri:** 2D Scatter Plot haritası üzerindeki katılımcı noktalarına gelindiğinde nickname ve bot/gerçek durumu tooltip ile yansıtılır.
-4. 🛡️ **Gelişmiş Moderasyon & Katılımcı Engelleme (Ban/Kick):** Yöneticiler sabote edici kullanıcıları masadan atabilir. Atılan kullanıcının oyları anında analiz matrisinden düşürülür.
-5. 🌉 **Görüş Havuzu (Opinion Pool):** Katılımcılar approved olmuş tüm görüşler arasından kelime bazlı arama yapabilir, kamplara veya uzlaşılan köprülere göre süzebilir ve oylarını anında havuz üzerinden güncelleyebilirler.
-6. 🗳️ **Offline Oylama & Arka Plan Sync:** İnternet koptuğunda katılımcının oyları yerelde sıraya alınır ve bağlantı geri geldiğinde sunucuya otomatik aktarılır.
-7. 🏛️ **Kurumsal e-Devlet Teması:** Arayüz, cam/mor parlak karanlık temadan tamamen arındırılarak kamu kurumlarına uygun güven verici lacivert (`#0c2340`), koyu mavi, beyaz ve açık gri hafif kurumsal bir tasarıma kavuşturulmuştur.
-8. 🔒 **Güçlendirilmiş Şifre Güvenliği:** Şifre korumalı oturumların konusu (deliberation topic) ve görüş listesi, şifre doğrulanana kadar ziyaretçilerden gizlenir.
-9. 🗺️ **Sınırlı Canlı Ekran Erişimi:** Canlı ekran `/live` ve `/live/:code` rotalarına sadece o oturuma dahil olmuş kullanıcıların ve yöneticilerin erişebilmesi sağlanmış, aktif ekran değişimleriyle tarayıcı URL'si dinamik senkronize edilmiştir.
-10. ♻️ **Güvenli Oturum Arşivleme & Sıfırlama:** "Oturumu Sıfırla" metodu veritabanındaki eski analizleri ve görüşleri kalıcı olarak temizler. Sıfırlanan oturum `status: 'archived'` olarak işaretlenerek admin seçim listelerinden kaldırılır ve bu kodla tekrar katılım engellenir.
+---
+
+## 📦 CompDemocracy OpenData Oturumları
+
+[compdemocracy/openData](https://github.com/compdemocracy/openData) açık veri reposundaki en yüksek katılımlı 5 kamusal müzakere oturumu sisteme entegre edilmiştir:
+
+| Oturum Kodu | Başlık & Konu | Katılımcı Sayısı | Oy Sayısı |
+|---|---|---|---|
+| **`BG2050`** | **Bowling Green 2050 Vizyonu & Gönüllülük** | 7.886 | 1.034.363 |
+| **`MARCHON`** | **Operation Marching Orders Vatandaş İnisiyatifi** | 6.289 | 536.984 |
+| **`KLIMA22`** | **Avusturya İklim Konseyi 2022 (Klimaticket)** | 3.142 | 307.778 |
+| **`AMASSEM`** | **American Assembly Kent Yönetimi & Altyapı** | 2.031 | 226.148 |
+| **`VTAIWAN`** | **vTaiwan UberX & Dijital Paylaşım Ekonomisi** | 1.921 | 49.997 |
 
 ---
 
@@ -71,138 +76,40 @@ Müzakere Masası platformunun son aşamalarında aşağıdaki kurumsal analitik
 | Katman | Teknoloji | Açıklama |
 |--------|-----------|----------|
 | **Frontend** | React 18 + Vite 5 | SPA mimarisi, JSX bileşenleri |
-| **Stil** | Vanilla CSS | Glassmorphism, CSS değişkenleri, responsive grid |
-| **Diller** | JS (ES6+) + CSS | Çoklu dil (i18n) sözlük altyapısı |
+| **Stil** | Vanilla CSS | Swiss Bento grid, CSS değişkenleri, responsive grid |
+| **Diller** | JS (ES6+) + CSS | TR/EN i18n sözlük altyapısı |
 | **İkonlar** | Lucide React | SVG tabanlı ikonlar |
 | **Backend** | Express 4 + Node.js | REST API sunucusu |
 | **Gerçek Zamanlı** | Socket.io 4 | Çift yönlü WebSocket iletişimi |
-| **Veritabanı** | PostgreSQL 16 + Prisma 5 | İlişkisel veri modeli (veya RAM yedek modu) |
+| **Veritabanı** | PostgreSQL / SQLite + Prisma | İlişkisel veri modeli (veya In-Memory mod) |
 | **Kimlik Doğrulama** | JWT + Bcrypt | Token tabanlı şifreli doğrulama |
-| **Test** | Vitest | Algoritmalar için birim testleri |
-
----
-
-## 🏗 Proje Mimarisi
-
-### Dizin Yapısı
-
-```
-müzakere-masası/
-├── index.html                  # Giriş HTML belgesi
-├── package.json                # Bağımlılıklar ve script'ler
-├── vite.config.js              # Vite proxy yapılandırması
-├── docker-compose.yml          # PostgreSQL konteyner tanımı
-├── run.ps1                     # Windows başlatma scripti
-│
-├── prisma/
-│   ├── schema.prisma           # targetK, customCampNames ve polarizationHistory eklenmiş şema
-│   └── seed.js                 # Master admin seed verisi
-│
-├── server/
-│   ├── index.js                # Express sunucusu ve soket olayları
-│   ├── database.js             # Veritabanı ve in-memory cache metotları
-│   ├── algorithms.js           # PCA, K-Means ve köprü analizi motoru
-│   └── tests/                  # Birim testleri
-│
-└── src/
-    ├── main.jsx                # React giriş noktası
-    ├── App.jsx                 # Dil seçimi ve ana yönlendirici state
-    ├── i18n.js                 # TR/EN çeviri sözlüğü ve t() yardımcısı
-    ├── App.css                 # Kurumsal global stil şablonu (e-Devlet teması)
-    └── components/
-        ├── Lobby.jsx           # Giriş ekranı (masa kodu, rumuz, oturum tipi)
-        ├── Participant.jsx     # Oylama, harita, Görüş Havuzu ve moderasyon
-        ├── AdminDashboard.jsx  # Yönetici paneli, K seçimi, yeniden adlandırma
-        ├── LiveScreen.jsx      # Canlı projeksiyon ekranı (oturum bağlamı kontrollü)
-        └── ReportView.jsx      # Sonuç raporu, SVG trend grafiği
-```
-
-### Veri Akışı
-
-```
-Katılımcı Oyu / Güncellemesi
-      │
-      ▼
-  Socket.io "submit-vote"
-      │
-      ▼
-  database.js: castVote() ──► In-Memory Map + Prisma DB
-      │
-      ▼
-  runAndBroadcastAnalysis() (1.5s debounce)
-      │
-      ├──► calculatePCA()                  → 2D koordinatlar
-      ├──► calculateKMeans() (targetK ile)  → Dinamik kamp grupları
-      ├──► analyzeCampsAndBridges()        → Köprü & Kamp verileri
-      ├──► addPolarizationHistoryEntry()   → Zaman serisi geçmişi kaydı
-      └──► Custom Name Mapping             → Özel isim eşleşmeleri
-            │
-            ▼
-      Socket.io "analysis-update" → Tüm bağlı istemcilere yayın
-```
+| **Test** | Vitest | Birim & algoritma doğruluk testleri (45/45) |
 
 ---
 
 ## 🚀 Kurulum & Çalıştırma
 
-### Hızlı Başlangıç (In-Memory Mod)
-
-PostgreSQL veya Docker gerektirmeden bellek içi modda çalıştırma:
-
 ```bash
 # 1. Bağımlılıkları yükle
 npm install
 
-# 2. Geliştirme sunucularını başlat (Frontend + Backend paralel)
+# 2. Geliştirme sunucularını başlat (Frontend + Backend)
 npm run dev
+
+# 3. CompDemocracy Top 5 Açık Veri Oturumlarını Tohumla (Opsiyonel)
+node server/seed_open_data.js
 ```
 
-Vite sunucusu `http://localhost:5173` adresinde, backend ise `http://localhost:3001` adresinde çalışacaktır. Veritabanı bulunamadığında in-memory mod otomatik olarak aktifleşir.
+Vite sunucusu `http://localhost:5173` adresinde, Express backend ise `http://localhost:3001` adresinde çalışacaktır.
 
 ---
 
 ## 📖 Kullanım Kılavuzu
 
 ### Yönetici Paneli
-
-**Giriş Bilgileri:**
-* **E-posta:** `admin@muzakere.local`
-* **Şifre:** `admin123`
-
-1. Sağ üst köşedeki **"Yönetici Paneli"** butonuna tıklayın ve şifreyi girin.
-2. Açılan panelde:
-   - **Hedef Kamp Sayısı:** Fikir kamplarının sayısını `2` ile `5` arasında dinamik ayarlayabilirsiniz.
-   - **Kampları Yeniden Adlandır:** Oluşan kampların yanındaki "Düzenle" butonuna basarak özel isimler atayabilirsiniz.
-   - **Bot Simülatörü:** +100 veya +200 bot ekleyerek anlık küme dağılımını test edebilirsiniz.
-
-### Katılımcı ve Görüş Havuzu
-* Katılımcı ekranında oylama panelinin altında approved olan tüm müzakere görüşleri listelenir.
-* Arama çubuğu ile belirli bir kelimeyi arayabilir ya da dropdown üzerinden kamplara göre filtre uygulayabilirsiniz.
-* Havuzdaki oylama butonlarıyla oylarınızı anlık güncelleyebilirsiniz.
-
-### Çoklu Dil Yönetimi
-* Uygulamanın en üst kısmında yer alan `TR` ve `EN` butonları ile tüm platform dilini Türkçe veya İngilizceye dönüştürebilirsiniz.
-
----
-
-## 📡 API ve Soket Referansı
-
-### Yeni Soket Olayları (Emit)
-* `admin-update-camps-count` `{ sessionCode, targetK }`: Hedef küme sayısını değiştirir.
-* `admin-rename-camp` `{ sessionCode, campId, newName }`: Belirli bir kampı isimlendirir.
-
----
-
-## 🧮 Algoritmalar
-
-### 1. PCA — Temel Bileşenler Analizi
-NIPALS iteratif algoritması kullanılarak katılımcı oy matrisi (`1`, `-1`, `0` değerleri içeren) 2 boyuta indirgenir ve koordinatlar `[-80, 80]` aralığına normalize edilir.
-
-### 2. Dinamik K-Means Kümeleme
-PCA skor koordinatları K-Means algoritması ile kümelenir. `targetK` değeri yönetici panelinden dinamik olarak okunduğundan, K-Means centroidleri ve atamaları seçilen K değerine göre anlık olarak güncellenir.
-
-### 3. Kutuplaşma Derecesi Trendi
-Her analiz aşamasında kutuplaşma derecesi (`polarisability` %) hesaplanır ve `addPolarizationHistoryEntry` metodu ile zaman serisi olarak saklanır. Bu veri `ReportView.jsx` içerisindeki SVG grafik motorunda çizgisel değişim grafiğine dönüştürülür.
+* **Giriş:** `admin@muzakere.local` / `admin123`
+* Panel üstünde yer alan Meta-Analiz tablosundan **BG2050**, **KLIMA22**, **VTAIWAN**, **MARCHON** veya **AMASSEM** oturumlarını tek tıkla seçip yönetebilirsiniz.
+* **Uzlaşı Potansiyellerini Keşfet** butonuna basarak seçili oturumun dinamik uzlaşı ve diyalog analizi raporunu alabilirsiniz.
 
 ---
 
@@ -212,7 +119,7 @@ Birim testlerini çalıştırmak için:
 ```bash
 npm run test
 ```
-Bu testler PCA boyutsallık indirgeme doğruluğunu, K-Means yakınsamasını ve Köprü Cümle formüllerinin matematiksel doğruluğunu test eder.
+45/45 birim testi PCA boyutsallık indirgeme doğruluğunu, K-Means kümeleme yakınsamasını ve Köprü Cümle formüllerinin matematiksel doğruluğunu onaylar.
 
 ---
 

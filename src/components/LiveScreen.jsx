@@ -412,20 +412,17 @@ export default function LiveScreen({ question, analysis, stats, status = 'active
           {bridges.length > 0 ? (
             <div className="bridge-list">
               {bridges.slice(0, 4).map((bridge, index) => (
-                <div key={bridge.id || index} className="bridge-item">
-                  <div style={{ fontSize: '1.05rem', fontWeight: 500, lineHeight: 1.4 }}>
+                <div key={bridge.id || index} className="bridge-accent-card">
+                  <div className="bridge-accent-badge">
+                    ⚡ {lang === 'tr' ? 'Köprü Görüş (Ortak Mutabakat)' : 'Bridge Statement (Consensus)'}
+                  </div>
+                  <div className="bridge-accent-text">
                     "{bridge.text}"
                   </div>
-                  <div className="bridge-meta" style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'flex-start' }}>
-                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                      <span className="bridge-tag">{lang === 'tr' ? 'Ortak Mutabakat' : 'Common Consensus'}</span>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{lang === 'tr' ? 'Ortalama Onay' : 'Average Approval'}: %{bridge.overallRate}</span>
-                    </div>
+                  <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.75rem', alignItems: 'center', fontSize: '0.82rem', color: '#64748b' }}>
+                    <span>{lang === 'tr' ? 'Ortalama Onay' : 'Avg Approval'}: <strong style={{ color: '#0f172a' }}>%{bridge.overallRate}</strong></span>
                     {getConsensusGroupsText(bridge) && (
-                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                        <strong>{lang === 'tr' ? 'Mutabık Gruplar: ' : 'Consensus Groups: '}</strong>
-                        <span style={{ color: 'var(--color-agree)', fontWeight: 600 }}>{getConsensusGroupsText(bridge)}</span>
-                      </div>
+                      <span>• {lang === 'tr' ? 'Mutabık Gruplar: ' : 'Consensus Groups: '} <strong style={{ color: '#2563eb' }}>{getConsensusGroupsText(bridge)}</strong></span>
                     )}
                   </div>
                 </div>
