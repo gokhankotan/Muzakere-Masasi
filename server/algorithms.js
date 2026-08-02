@@ -423,9 +423,23 @@ export function analyzeCampsAndBridges(statements, participants, assignments, k 
     campCharacteristics[c] = campCharacteristics[c].slice(0, 3);
   }
 
+  // ⏱ campApprovalRatesTable: campId → statementId → rate
+  // campVotes zaten yukarıda hesaplanmıştı — sıfır ek maliyet.
+  // getCampAssignmentExplanation bu tabloyu kullanarak tüm oy matrisini
+  // tekrar taramak zorunda kalmaz.
+  const campApprovalRatesTable = {};
+  for (let c = 0; c < k; c++) {
+    campApprovalRatesTable[c] = {};
+    statements.forEach((st, sIdx) => {
+      const votes = campVotes[c][sIdx];
+      campApprovalRatesTable[c][st.id] = votes.total > 0 ? votes.agree / votes.total : 0;
+    });
+  }
+
   return {
     bridges,
-    campCharacteristics
+    campCharacteristics,
+    campApprovalRatesTable
   };
 }
 
@@ -559,6 +573,110 @@ export function calculatePolarisability(points, camps) {
   return {
     polarisability: parseFloat(polarisability.toFixed(2)),
     insufficientVariance: false
+  };
+}
+
+/**
+ * Bir katılımcının neden belirli bir kampa yerleştirildiğini açıklayan verileri üretir.
+ *
+ * @param {string} participantId - Katılımcı ID
+ * @param {object} session - DB'deki oturum nesnesi
+ * @returns {object|null} Açıklama nesnesi
+ */
+export function getCampAssignmentExplanation(participantId, session) {
+  if (!session || !session.analysis || !session.analysis.points || !session.analysis.camps) {
+    return null;
+  }
+
+  const participant = session.participants?.find(p => p.id === participantId);
+  if (!participant) return null;
+
+  const point = session.analysis.points.find(pt => pt.id === participantId || (participant.nickname && pt.nickname === participant.nickname));
+  if (!point || point.campId === undefined || point.campId === null) {
+    return null;
+  }
+
+  const camp = session.analysis.camps.find(c => c.id === point.campId);
+  const campName = session.customCampNames?.[point.campId] || camp?.name || `Fikir Grubu ${String.fromCharCode(65 + point.campId)}`;
+
+  const statements = session.statements || [];
+
+  // ─── HIZ YOLU: campApprovalRates önbelleği mevcut (runAnalysis her tetiklendiğinde üretiliyor)
+  // Bu path tamamen O(S) — S: görüş sayısı. Hiçbir katılımcı döngüsü yok.
+  const cachedRates = session.analysis.campApprovalRates?.[point.campId];
+
+  // ─── YAVAŞ YOL (lazy fallback): Önbellek eksikse — sadece o zaman O(n*S) hesapla
+  // Bu durumda uyarı bas; production'da bu path'e ASLA girilmemeli.
+  let sameCampParticipants = null;
+  const getSameCampParticipants = () => {
+    if (sameCampParticipants !== null) return sameCampParticipants;
+    console.warn(`⚠️ [CAMP EXPLANATION SLOW PATH] Oturum ${session.code || '?'} — campApprovalRates önbelleği eksik, O(n×S) fallback hesaplamaya girildi. runAnalysis'in tamamlandığından emin olun.`);
+
+    // O(n) hashmap: participantId / nickname → campId
+    const campIdMap = new Map();
+    for (const pt of session.analysis.points) {
+      campIdMap.set(pt.id, pt.campId);
+      if (pt.nickname) campIdMap.set(pt.nickname, pt.campId);
+    }
+    const activeParticipants = (session.participants || []).filter(p => !p.isBanned);
+    sameCampParticipants = activeParticipants.filter(p => {
+      const cid = campIdMap.get(p.id) ?? campIdMap.get(p.nickname);
+      return cid === point.campId;
+    });
+    return sameCampParticipants;
+  };
+
+  const scoredVotes = [];
+
+  statements.forEach(st => {
+    const userVote = participant.votes?.[st.id]; // 1: Katılıyorum, -1: Katılmıyorum, 0: Nötr, undefined: oylamadı
+    if (userVote === undefined || userVote === 0) return; // Nötr veya oylanmamışları atla
+
+    let campAgreeRate;
+
+    if (cachedRates !== undefined && cachedRates[st.id] !== undefined) {
+      // ✅ O(1) önbellek lookup — hız yolu
+      campAgreeRate = cachedRates[st.id];
+    } else {
+      // ⚠️ O(n) fallback — önbellek bu görüş için eksik
+      const peers = getSameCampParticipants();
+      let agreeCount = 0;
+      let totalVotes = 0;
+      peers.forEach(p => {
+        const v = p.votes?.[st.id];
+        if (v === 1) { agreeCount++; totalVotes++; }
+        else if (v === -1) { totalVotes++; }
+      });
+      campAgreeRate = totalVotes > 0 ? agreeCount / totalVotes : 0;
+    }
+
+    // Uyum skoru: Katılımcı 1 verdiğinde grubun kabul oranı yüksekse,
+    // veya katılımcı -1 verdiğinde grubun red oranı yüksekse (1 - agreeRate)
+    let alignmentScore = 0;
+    if (userVote === 1) {
+      alignmentScore = campAgreeRate;
+    } else if (userVote === -1) {
+      alignmentScore = 1 - campAgreeRate;
+    }
+
+    scoredVotes.push({
+      statementId: st.id,
+      text: st.text,
+      userVote: userVote === 1 ? 'AGREE' : 'DISAGREE',
+      campApprovalRate: Math.round(campAgreeRate * 100),
+      alignmentScore
+    });
+  });
+
+  // En yüksek 3 belirleyici oyu seç
+  scoredVotes.sort((a, b) => b.alignmentScore - a.alignmentScore);
+  const definingVotes = scoredVotes.slice(0, 3);
+
+  return {
+    participantId,
+    campId: point.campId,
+    campName,
+    definingVotes
   };
 }
 

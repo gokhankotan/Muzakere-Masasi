@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Send, ThumbsUp, ThumbsDown, EyeOff, MapPin, Sparkles, ShieldCheck, Check, X, Lock, Globe, ChevronDown, ChevronUp } from 'lucide-react';
+import { Send, ThumbsUp, ThumbsDown, EyeOff, MapPin, Sparkles, ShieldCheck, Check, X, Lock, Globe, ChevronDown, ChevronUp, Shield } from 'lucide-react';
 import { t } from '../i18n';
 
 const getCampColor = (campId, totalCamps) => {
@@ -38,6 +38,66 @@ export default function Participant({
 
   // Henüz oy verilmemiş görüşler
   const unvotedStatements = statements.filter(st => participant.votes[st.id] === undefined);
+
+  // Kamp Ataması Açıklama Paneli State'leri
+  const [showExplanation, setShowExplanation] = useState(false);
+  const [campExplanation, setCampExplanation] = useState(null);
+  const [loadingExplanation, setLoadingExplanation] = useState(false);
+  const [explanationError, setExplanationError] = useState(null);
+
+  const toggleExplanation = async () => {
+    if (showExplanation) {
+      setShowExplanation(false);
+      return;
+    }
+    setShowExplanation(true);
+    setExplanationError(null);
+
+    if (!campExplanation && participant?.id) {
+      setLoadingExplanation(true);
+      const code = sessionCode || 'DEFAULT';
+      const token = localStorage.getItem(`session_token_${code}`) || participant?.token;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+      try {
+        console.log(`📡 [FETCH CAMP EXPLANATION] Katılımcı ${participant.id} (Oturum: ${code})…`);
+        const res = await fetch(`/api/sessions/${code}/participants/${participant.id}/camp-explanation`, {
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        console.log(`📥 [CAMP EXPLANATION RESPONSE] Status: ${res.status} ${res.statusText}`);
+
+        let data = {};
+        try {
+          data = await res.json();
+        } catch (jsonErr) {
+          console.error('Failed to parse JSON response:', jsonErr);
+        }
+
+        if (res.ok && data.success) {
+          setCampExplanation(data.explanation);
+          setExplanationError(null);
+        } else {
+          const errMsg = data.message || `HTTP ${res.status}: ${res.statusText || (lang === 'tr' ? 'Açıklama şu anda yüklenemedi' : 'Unable to load explanation')}`;
+          console.warn(`⚠️ [CAMP EXPLANATION ERROR] ${errMsg}`);
+          setExplanationError(errMsg);
+        }
+      } catch (err) {
+        clearTimeout(timeoutId);
+        console.error('❌ [CAMP EXPLANATION FETCH CATCH]', err);
+        if (err.name === 'AbortError') {
+          setExplanationError(lang === 'tr' ? 'Açıklama yükleme zaman aşımına uğradı (15s). Sunucu yanıt vermedi.' : 'Explanation request timed out (15s). Server did not respond.');
+        } else {
+          setExplanationError(lang === 'tr' ? `Bağlantı hatası: ${err.message}` : `Connection error: ${err.message}`);
+        }
+      } finally {
+        setLoadingExplanation(false);
+      }
+    }
+  };
 
   const handleOpinionSubmit = (e) => {
     e.preventDefault();
@@ -91,6 +151,7 @@ export default function Participant({
   const myCamp = myPoint !== undefined ? analysis?.camps?.find(c => c.id === myPoint.campId) : null;
   const renderPoints = isInsufficient ? [] : (analysis?.points || []);
   const camps = isInsufficient ? [] : (analysis?.camps || []);
+  const minorityInsights = isInsufficient ? [] : (analysis?.minorityInsights || []);
 
   // Varyans uyarısı
   const varianceExplained = analysis?.varianceExplained || [];
@@ -517,11 +578,158 @@ export default function Participant({
               <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
                 {t('partMapStatusCampSize', lang, { count: Math.max(0, myCamp.size - 1) })}
               </p>
+
+              {/* Şeffaflık Butonu: Neden Bu Kampa Konuldum? */}
+              <div style={{ marginTop: '0.75rem' }}>
+                <button
+                  onClick={toggleExplanation}
+                  style={{
+                    background: 'rgba(99, 102, 241, 0.08)',
+                    border: '1px solid rgba(99, 102, 241, 0.25)',
+                    borderRadius: '20px',
+                    padding: '0.35rem 0.85rem',
+                    fontSize: '0.78rem',
+                    color: 'var(--color-secondary)',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  <span>ⓘ</span>
+                  <span>{lang === 'tr' ? 'Neden bu gruptayım?' : 'Why am I in this group?'}</span>
+                </button>
+              </div>
+
+              {/* Şeffaflık Paneli (Expandable Card) */}
+              {showExplanation && (
+                <div style={{
+                  marginTop: '0.75rem',
+                  background: 'rgba(15, 23, 42, 0.5)',
+                  border: '1px solid var(--border-light)',
+                  borderRadius: '8px',
+                  padding: '0.85rem 1rem',
+                  textAlign: 'left',
+                  fontSize: '0.82rem'
+                }}>
+                  <h4 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--color-primary-text)', marginBottom: '0.6rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <span>🎯</span>
+                    <span>{lang === 'tr' ? 'Sizi bu kampa yaklaştıran oylarınız:' : 'Votes bringing you to this group:'}</span>
+                  </h4>
+
+                  {loadingExplanation ? (
+                    <p style={{ fontStyle: 'italic', color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+                      ⏳ {lang === 'tr' ? 'Hesaplanıyor...' : 'Calculating...'}
+                    </p>
+                  ) : explanationError ? (
+                    <div style={{ padding: '0.5rem 0.75rem', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '6px', color: '#ef4444', fontSize: '0.78rem' }}>
+                      ⚠️ {explanationError}
+                    </div>
+                  ) : campExplanation && campExplanation.definingVotes && campExplanation.definingVotes.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      {campExplanation.definingVotes.map((vote, idx) => (
+                        <div key={vote.statementId || idx} style={{
+                          background: 'rgba(255, 255, 255, 0.03)',
+                          borderLeft: `3px solid ${vote.userVote === 'AGREE' ? '#22c55e' : '#ef4444'}`,
+                          borderRadius: '4px',
+                          padding: '0.5rem 0.65rem'
+                        }}>
+                          <div style={{ fontStyle: 'italic', color: 'var(--text-main)', marginBottom: '0.25rem', lineHeight: 1.35 }}>
+                            "{vote.text}"
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                            <span>
+                              {vote.userVote === 'AGREE' ? (
+                                <span style={{ color: '#22c55e', fontWeight: 600 }}>👍 {lang === 'tr' ? 'Katılıyorum' : 'Agreed'}</span>
+                              ) : (
+                                <span style={{ color: '#ef4444', fontWeight: 600 }}>👎 {lang === 'tr' ? 'Katılmıyorum' : 'Disagreed'}</span>
+                              )}
+                            </span>
+                            <span>
+                              {lang === 'tr' ? `Gruptakilerin %${vote.campApprovalRate} kabulü` : `%${vote.campApprovalRate} group approval`}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p style={{ fontStyle: 'italic', color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+                      {lang === 'tr' ? 'Henüz yeterli oy verisi bulunmamaktadır.' : 'Not enough vote data yet.'}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           ) : (
             <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textAlign: 'center' }}>
               {t('partMapStatusWait', lang)}
             </p>
+          )}
+        </div>
+
+        {/* Azınlık Görüşleri Paneli (Minority Opinion Shield) */}
+        <div style={{
+          marginTop: '0.65rem',
+          width: '100%',
+          borderTop: '1px solid rgba(245, 158, 11, 0.25)',
+          paddingTop: '0.65rem'
+        }}>
+          <h3 style={{
+            fontSize: '0.95rem',
+            fontWeight: 700,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.4rem',
+            marginBottom: '0.5rem',
+            color: '#f59e0b'
+          }}>
+            <Shield size={16} style={{ color: '#f59e0b' }} />
+            {lang === 'tr' ? 'Az Duyulan Ama Güçlü Argümanlar' : 'Underrepresented Strong Arguments'}
+          </h3>
+          <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.75rem', lineHeight: 1.4 }}>
+            {lang === 'tr'
+              ? 'Bu görüşler az oy almış ancak güçlü gerekçe içeriyor.'
+              : 'These opinions received few votes but contain strong reasoning.'}
+          </p>
+
+          {minorityInsights.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+              {minorityInsights.map((insight, idx) => (
+                <div key={insight.id || idx} style={{
+                  background: 'rgba(245, 158, 11, 0.06)',
+                  border: '1px solid rgba(245, 158, 11, 0.25)',
+                  borderLeft: '3px solid #f59e0b',
+                  borderRadius: '7px',
+                  padding: '0.65rem 0.85rem'
+                }}>
+                  <div style={{ fontSize: '0.82rem', lineHeight: 1.5, marginBottom: '0.4rem' }}>
+                    "{insight.text}"
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.6rem', fontSize: '0.72rem', color: 'var(--text-muted)', flexWrap: 'wrap' }}>
+                    <span style={{
+                      background: 'rgba(245, 158, 11, 0.15)',
+                      border: '1px solid rgba(245, 158, 11, 0.3)',
+                      borderRadius: '999px',
+                      padding: '0.1rem 0.45rem',
+                      color: '#f59e0b',
+                      fontWeight: 600
+                    }}>
+                      🧠 {lang === 'tr' ? 'Gerekçe Kalitesi' : 'Quality'}: %{insight.qualityScore}
+                    </span>
+                    <span>🗳️ {insight.voteCount} {lang === 'tr' ? 'Oy' : 'Votes'}</span>
+                    <span>👍 %{insight.approvalRate ?? Math.round((insight.agreeCount / Math.max(1, insight.voteCount))*100)} {lang === 'tr' ? 'Onay' : 'Approval'}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ padding: '0.75rem', border: '1px dashed rgba(245, 158, 11, 0.25)', borderRadius: '7px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+              💡 {lang === 'tr'
+                ? 'Henüz azınlık görüşü tespiti için yeterli gerekçeli görüş verisi yok.'
+                : 'No underrepresented strong arguments detected yet.'}
+            </div>
           )}
         </div>
 

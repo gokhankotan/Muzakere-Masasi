@@ -64,7 +64,7 @@ export default function ReportView({ onBack, sessionCode, lang = "tr" }) {
     );
   }
 
-  const { question, createdAt, participantsCount, statementsCount, analysis, participants, polarizationImpacts } = reportData;
+  const { question, createdAt, participantsCount, statementsCount, analysis, participants, polarizationImpacts, minorityInsights } = reportData;
   const varianceExplained = analysis?.varianceExplained || [];
   const totalVariance = varianceExplained.reduce((s, v) => s + v, 0);
   const showVarianceWarning = !analysis?.insufficientData && !analysis?.insufficientVariance && varianceExplained.length > 0 && totalVariance < 0.40;
@@ -345,6 +345,52 @@ export default function ReportView({ onBack, sessionCode, lang = "tr" }) {
               )}
             </section>
 
+            {/* 4.2. Azınlık Görüş Kalkanı */}
+            {minorityInsights && minorityInsights.length > 0 && (
+              <section className="report-section">
+                <h2 className="report-section-title">
+                  <span className="report-section-num">4.2.</span>
+                  {lang === "tr" ? "🛡️ Az Duyulan Ama Güçlü Argümanlar (Azınlık Görüş Kalkın)" : "🛡️ Underrepresented Strong Arguments (Minority Opinion Shield)"}
+                </h2>
+                <p className="report-body-text">
+                  {lang === "tr"
+                    ? "Aşağıdaki görüşler, oturum genelinde az oy almış (alt %25'lik dilim) ancak kural tabanlı gerekçe kalitesi analizi (metin uzunluğu, bağlaç belirteçleri, yapısal kalite) açısından 70 puanın üzerinde skor elde etmiştir. Bu argümanlar, sayısal ağırlıkları düşük olsa da müzakere kalitesi açısından değerlendirmeye değer bulunmaktadır."
+                    : "The following opinions received few votes (bottom 25th percentile) but scored above 70 in the rule-based reasoning quality analysis (text length, reasoning markers, structural quality). Although numerically underrepresented, they may merit deliberation."}
+                </p>
+                <table className="report-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: "60%" }}>{lang === "tr" ? "Görüş Metni" : "Opinion Text"}</th>
+                      <th style={{ textAlign: "center" }}>{lang === "tr" ? "Gerekçe Skoru" : "Quality Score"}</th>
+                      <th style={{ textAlign: "center" }}>{lang === "tr" ? "Oy Sayısı" : "Vote Count"}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {minorityInsights.map((insight, idx) => (
+                      <tr key={insight.id || idx} style={{ borderLeft: "3px solid #f59e0b" }}>
+                        <td><em>"{insight.text}"</em></td>
+                        <td style={{ textAlign: "center" }}>
+                          <span style={{
+                            padding: "0.25rem 0.6rem",
+                            borderRadius: "4px",
+                            fontSize: "0.85rem",
+                            fontWeight: "bold",
+                            background: "rgba(245, 158, 11, 0.1)",
+                            color: "#d97706",
+                            border: "1px solid rgba(245, 158, 11, 0.3)",
+                            display: "inline-block"
+                          }}>
+                            🧠 {insight.qualityScore}/100
+                          </span>
+                        </td>
+                        <td style={{ textAlign: "center", color: "var(--text-muted)" }}>{insight.voteCount}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </section>
+            )}
+
             {/* 5. Fikir Gruplari */}
             <section className="report-section">
               <h2 className="report-section-title"><span className="report-section-num">5.</span>{lang === "tr" ? "Fikir Gruplarinin Yapisi" : "Structure of Opinion Groups"}</h2>
@@ -394,41 +440,69 @@ export default function ReportView({ onBack, sessionCode, lang = "tr" }) {
               )}
             </section>
 
-            {/* 6. Kutuplasma Zaman Serisi (Ekrana Özel) */}
-            <section className="report-section no-print">
-              <h2 className="report-section-title"><span className="report-section-num">6.</span>{lang === "tr" ? "Kutuplasma Derecesi Zaman Serisi" : "Polarization Degree Timeline"}</h2>
-              <p className="report-body-text">{lang === "tr" ? "Oturum boyunca kutuplasma oraninin kronolojik degisimi." : "Chronological change of polarization rate throughout the session."}</p>
-              {analysis?.polarizationHistory && analysis.polarizationHistory.length >= 2 ? (() => {
-                const history = analysis.polarizationHistory;
-                const W = 520, H = 180, pL = 40, pR = 20, pT = 20, pB = 30;
-                const cW = W - pL - pR, cH = H - pT - pB;
-                const pts = history.map((pt, i) => ({ x: pL + (i / (history.length - 1)) * cW, y: (pT + cH) - (pt.v / 100) * cH, val: pt.v, time: pt.t }));
-                const linePath = pts.map((pt, i) => `${i === 0 ? "M" : "L"} ${pt.x} ${pt.y}`).join(" ");
-                return (
-                  <div style={{ position: "relative", background: "var(--bg-card)", border: "1px solid var(--border-light)", padding: "1rem", borderRadius: "8px" }}>
-                    {hoveredHistoryPoint && (
-                      <div style={{ position: "absolute", background: "var(--color-primary)", color: "#fff", border: "1px solid var(--border-light)", padding: "0.4rem 0.75rem", borderRadius: "6px", fontSize: "0.78rem", pointerEvents: "none", left: `${Math.min(hoveredHistoryPoint.x - 50, W - 110)}px`, top: `${hoveredHistoryPoint.y - 45}px`, zIndex: 20 }}>
-                        <div style={{ fontWeight: "bold", color: "var(--color-secondary)" }}>%{hoveredHistoryPoint.val} {lang === "tr" ? "Kutuplasma" : "Polarization"}</div>
-                        <div style={{ fontSize: "0.68rem", color: "var(--text-muted)", marginTop: "0.1rem" }}>{new Date(hoveredHistoryPoint.time).toLocaleTimeString(lang === "tr" ? "tr-TR" : "en-US")}</div>
+            {/* 6. Kutuplaşma Trendi */}
+            {analysis?.polarizationHistory && (() => {
+              const hist = (analysis.polarizationHistory || []).filter(pt => !pt.isSimulated);
+              if (hist.length < 2) return null;
+              const firstVal = hist[0].v;
+              const lastVal  = hist[hist.length - 1].v;
+              const diff = lastVal - firstVal;
+              const trendLabel = diff > 1
+                ? (lang === "tr" ? `↑ Arttı (+${diff.toFixed(1)}%)` : `↑ Increased (+${diff.toFixed(1)}%)`)
+                : diff < -1
+                ? (lang === "tr" ? `↓ Azaldı (${diff.toFixed(1)}%)` : `↓ Decreased (${diff.toFixed(1)}%)`)
+                : (lang === "tr" ? "→ Sabit kaldı" : "→ Remained stable");
+              const trendColor = diff > 1 ? "#f59e0b" : diff < -1 ? "#22c55e" : "#94a3b8";
+              return (
+                <section className="report-section">
+                  <h2 className="report-section-title"><span className="report-section-num">6.</span>{lang === "tr" ? "Kutuplaşma Derecesi Trendi" : "Polarization Degree Trend"}</h2>
+                  <p className="report-body-text">
+                    {lang === "tr" ? "Oturum boyunca kutuplaşma oranının kronolojik değişimi." : "Chronological change of the polarization rate throughout the session."}
+                  </p>
+                  {/* ── Statik özet: print-visible ── */}
+                  <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap", marginBottom: "1.25rem" }}>
+                    {[
+                      [lang === "tr" ? "Başlangıç" : "Start", `%${firstVal.toFixed(1)}`],
+                      [lang === "tr" ? "Son" : "End", `%${lastVal.toFixed(1)}`],
+                      [lang === "tr" ? "Değişim" : "Change", <span key="ch" style={{ color: trendColor, fontWeight: 700 }}>{trendLabel}</span>],
+                      [lang === "tr" ? "Veri Noktası" : "Snapshots", String(hist.length)],
+                    ].map(([label, value], i) => (
+                      <div key={i} className="report-method-card" style={{ minWidth: "110px", textAlign: "center" }}>
+                        <div className="report-method-title" style={{ fontSize: "0.78rem" }}>{label}</div>
+                        <div className="report-method-body" style={{ fontSize: "1rem", fontWeight: 700, color: "var(--text-main)" }}>{value}</div>
                       </div>
-                    )}
-                    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}>
-                      {[0, 25, 50, 75, 100].map(level => { const y = (pT + cH) - (level / 100) * cH; return (<g key={level}><line x1={pL} y1={y} x2={W - pR} y2={y} stroke="var(--border-light)" strokeWidth={1} /><text x={pL - 8} y={y + 4} textAnchor="end" fontSize="9" fill="var(--text-muted)">%{level}</text></g>); })}
-                      <path d={linePath} fill="none" stroke="var(--color-secondary)" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
-                      {pts.map((pt, i) => (<circle key={i} cx={pt.x} cy={pt.y} r={hoveredHistoryPoint && hoveredHistoryPoint.time === pt.time ? 6 : 4} fill={hoveredHistoryPoint && hoveredHistoryPoint.time === pt.time ? "var(--color-secondary)" : "var(--color-agree)"} stroke="#fff" strokeWidth={1.5} style={{ cursor: "pointer" }} onMouseEnter={() => setHoveredHistoryPoint(pt)} onMouseLeave={() => setHoveredHistoryPoint(null)} />))}
-                    </svg>
+                    ))}
                   </div>
-                );
-              })() : (
-                <div style={{ padding: "2rem 1rem", border: "1px dashed var(--border-light)", textAlign: "center", color: "var(--text-muted)", borderRadius: "8px", fontStyle: "italic" }}>
-                  {lang === "tr" ? "Grafik için en az 2 analiz döngüsü gerekir." : "At least 2 analysis cycles required for chart."}
-                </div>
-              )}
-            </section>
+                  {/* ── İnteraktif grafik: sadece ekran ── */}
+                  <div className="no-print">
+                    {(() => {
+                      const history = hist;
+                      const W = 520, H = 180, pL = 40, pR = 20, pT = 20, pB = 30;
+                      const cW = W - pL - pR, cH = H - pT - pB;
+                      const pts = history.map((pt, i) => ({ x: pL + (i / (history.length - 1)) * cW, y: (pT + cH) - (pt.v / 100) * cH, val: pt.v, time: pt.t }));
+                      const linePath = pts.map((pt, i) => `${i === 0 ? "M" : "L"} ${pt.x} ${pt.y}`).join(" ");
+                      return (
+                        <div style={{ position: "relative", background: "var(--bg-card)", border: "1px solid var(--border-light)", padding: "1rem", borderRadius: "8px" }}>
+                          {hoveredHistoryPoint && (
+                            <div style={{ position: "absolute", background: "var(--color-primary)", color: "#fff", border: "1px solid var(--border-light)", padding: "0.4rem 0.75rem", borderRadius: "6px", fontSize: "0.78rem", pointerEvents: "none", left: `${Math.min(hoveredHistoryPoint.x - 50, W - 110)}px`, top: `${hoveredHistoryPoint.y - 45}px`, zIndex: 20 }}>
+                              <div style={{ fontWeight: "bold", color: "var(--color-secondary)" }}>%{hoveredHistoryPoint.val} {lang === "tr" ? "Kutuplaşma" : "Polarization"}</div>
+                              <div style={{ fontSize: "0.68rem", color: "var(--text-muted)", marginTop: "0.1rem" }}>{new Date(hoveredHistoryPoint.time).toLocaleTimeString(lang === "tr" ? "tr-TR" : "en-US")}</div>
+                            </div>
+                          )}
+                          <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}>
+                            {[0, 25, 50, 75, 100].map(level => { const y = (pT + cH) - (level / 100) * cH; return (<g key={level}><line x1={pL} y1={y} x2={W - pR} y2={y} stroke="var(--border-light)" strokeWidth={1} /><text x={pL - 8} y={y + 4} textAnchor="end" fontSize="9" fill="var(--text-muted)">%{level}</text></g>); })}
+                            <path d={linePath} fill="none" stroke="var(--color-secondary)" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+                            {pts.map((pt, i) => (<circle key={i} cx={pt.x} cy={pt.y} r={hoveredHistoryPoint && hoveredHistoryPoint.time === pt.time ? 6 : 4} fill={hoveredHistoryPoint && hoveredHistoryPoint.time === pt.time ? "var(--color-secondary)" : "var(--color-agree)"} stroke="#fff" strokeWidth={1.5} style={{ cursor: "pointer" }} onMouseEnter={() => setHoveredHistoryPoint(pt)} onMouseLeave={() => setHoveredHistoryPoint(null)} />))}
+                          </svg>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </section>
+              );
+            })()}
           </>
         )}
-
-
 
         {/* Alt Bilgi */}
         <div className="report-footer">

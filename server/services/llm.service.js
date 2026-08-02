@@ -92,14 +92,122 @@ export function clearAllLlmCache() {
 }
 
 // =======================================================
-// 2. EXPONENTIAL BACKOFF & MODEL VALIDATION (Req 4 & 5)
+// 2. RATE LIMITER (10 RPM) & CIRCUIT BREAKER (429-aware)
 // =======================================================
+
+// Proactive Rate Limiter (Proaktif İstek Sınırlayıcı)
+const MAX_REQUESTS_PER_MINUTE = 10;
+const requestTimestampsWindow = [];
+
+function checkAndRecordRateLimit() {
+  const now = Date.now();
+  // 60 saniyeden eski zaman damgalarını temizle
+  while (requestTimestampsWindow.length > 0 && requestTimestampsWindow[0] <= now - 60000) {
+    requestTimestampsWindow.shift();
+  }
+  
+  if (requestTimestampsWindow.length >= MAX_REQUESTS_PER_MINUTE) {
+    return false; // Limit aşıldı!
+  }
+  
+  requestTimestampsWindow.push(now);
+  return true; // İstek izni verildi
+}
+
+// Circuit breaker state — module-level, shared across all call sites
+let circuitBreakerBlockedUntil = 0; // epoch ms; 0 = open (not tripped)
+const CIRCUIT_BREAKER_DEFAULT_COOLDOWN_MS = 60_000; // 60 s fallback when no Retry-After header
+let lastRpdQuotaErrorTimestamp = 0; // Günlük RPD kotası dolduğunda kaydedilen zaman damgası
+
+export function getLlmQuotaStatus() {
+  const now = Date.now();
+  const isRpdExhausted = lastRpdQuotaErrorTimestamp > 0 && (now - lastRpdQuotaErrorTimestamp) < 24 * 60 * 60 * 1000;
+  const cbOpen = isCircuitBreakerOpen();
+  const cooldownRemainingSec = circuitBreakerBlockedUntil > now
+    ? Math.ceil((circuitBreakerBlockedUntil - now) / 1000)
+    : 0;
+  return {
+    isRpdExhausted,
+    lastRpdErrorTimestamp: lastRpdQuotaErrorTimestamp || null,
+    isCircuitBreakerOpen: cbOpen,
+    cooldownRemainingSec,
+    modelName,
+    hasApiKey: !!apiKey
+  };
+}
+
+export function resetRpdQuotaStatus() {
+  lastRpdQuotaErrorTimestamp = 0;
+  circuitBreakerBlockedUntil = 0;
+  console.log('🟢 [LLM QUOTA STATUS RESET] RPD kota ve circuit breaker durumu sıfırlandı.');
+}
+
+/**
+ * 429 alındığında Retry-After başlığını okur (yoksa 60 s kullanır),
+ * o süre boyunca TÜM LLM çağrılarını bloke eder ve fallback'e düşer.
+ * Bu sayede hata sayısı 3× katlanmaz.
+ */
+function tripCircuitBreaker(err, customCooldownMs = null) {
+  const retryAfterHeader =
+    err?.headers?.['retry-after'] ||
+    err?.response?.headers?.['retry-after'] ||
+    err?.error?.headers?.['retry-after'];
+
+  const retryAfterSec = retryAfterHeader ? parseInt(retryAfterHeader, 10) : null;
+  const cooldownMs = customCooldownMs || (
+    (Number.isFinite(retryAfterSec) && retryAfterSec > 0)
+      ? retryAfterSec * 1000
+      : CIRCUIT_BREAKER_DEFAULT_COOLDOWN_MS
+  );
+
+  circuitBreakerBlockedUntil = Date.now() + cooldownMs;
+  console.warn(
+    `🔴 [LLM CIRCUIT BREAKER TRIPPED] 429 TooManyRequests — LLM çağrıları ` +
+    `${Math.round(cooldownMs / 1000)}s boyunca bloke edildi. ` +
+    `Tüm istekler fallback motora yönlendirilecek. ` +
+    `Tekrar açılma: ${new Date(circuitBreakerBlockedUntil).toLocaleTimeString('tr-TR')}`
+  );
+}
+
+function isCircuitBreakerOpen() {
+  if (circuitBreakerBlockedUntil === 0) return false;
+  if (Date.now() >= circuitBreakerBlockedUntil) {
+    circuitBreakerBlockedUntil = 0;
+    console.log('🟢 [LLM CIRCUIT BREAKER RESET] Cooldown sona erdi, LLM çağrıları yeniden aktif.');
+    return false;
+  }
+  return true;
+}
+
 async function executeLlmWithRetry(requestParams, callType, maxRetries = 2) {
   if (!openaiClient) return null;
 
+  // 1. Proaktif RPM Kontrolü (Dakikada maks 10 istek)
+  if (!checkAndRecordRateLimit()) {
+    console.warn(`⏳ [LLM RATE LIMITER] Dakikalık limit (10 RPM) aşıldı! ${callType} isteği atlandı — kural tabanlı motor kullanılacak.`);
+    return null;
+  }
+
+  // 2. Circuit breaker açıksa (429 cooldown veya 24-saatlik RPD bloku) direkt fallback'e düş
+  if (isCircuitBreakerOpen()) {
+    const remainingSec = Math.ceil((circuitBreakerBlockedUntil - Date.now()) / 1000);
+    console.warn(`⏸️ [LLM CIRCUIT BREAKER OPEN] ${callType} isteği atlanıyor — ${remainingSec}s daha bloke. Fallback kullanılıyor.`);
+    return null;
+  }
+
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      const response = await openaiClient.chat.completions.create(requestParams);
+      // Makul 12 saniyelik çağrı timeout'u (soket asılı kalmalarını önler)
+      const timeoutMs = Number(process.env.LLM_CALL_TIMEOUT_MS) || 12000;
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('LLM_CALL_TIMEOUT')), timeoutMs)
+      );
+
+      const response = await Promise.race([
+        openaiClient.chat.completions.create(requestParams),
+        timeoutPromise
+      ]);
+
       const raw = response.choices[0]?.message?.content?.trim();
       const sanitized = sanitizeLLMResponse(raw, callType);
       if (sanitized) {
@@ -112,21 +220,53 @@ async function executeLlmWithRetry(requestParams, callType, maxRetries = 2) {
     } catch (err) {
       const status = err.status || err.statusCode || (err.response && err.response.status);
       const message = err.message || '';
+      const msgLower = message.toLowerCase();
 
-      const is404 = status === 404 || message.includes('404') || message.toLowerCase().includes('not found');
-      const is401 = status === 401 || message.includes('401') || message.toLowerCase().includes('unauthorized');
+      // ─── RPD (Requests Per Day) / GÜNLÜK KOTA AŞIMI TESPİTİ ─────────────────
+      // Günlük RPD limiti dolduğunda birkaç saniye beklemek hiçbir şeyi çözmez.
+      // Bu nedenle retry yapılmadan ANINDA kural tabanlı motor devreye sokulur.
+      const isRpdError =
+        (status === 429 || msgLower.includes('429')) &&
+        (msgLower.includes('quota') ||
+         msgLower.includes('daily') ||
+         msgLower.includes('rpd') ||
+         msgLower.includes('resource_exhausted') ||
+         msgLower.includes('per_day') ||
+         msgLower.includes('per day') ||
+         msgLower.includes('exceeded your current quota') ||
+         msgLower.includes('free tier'));
+
+      if (isRpdError) {
+        lastRpdQuotaErrorTimestamp = Date.now();
+        console.error(`🚨 [LLM RPD QUOTA EXHAUSTED] Günlük API kotası (RPD / Resource Exhausted) aşıldı! Retry yapılmadan ANINDA kural tabanlı fallback'e geçiliyor.`);
+        tripCircuitBreaker(err, 24 * 60 * 60 * 1000); // 24 saatlik devre kesici
+        return null; // RETRY YOK — anında fallback!
+      }
+
+      const is404 = status === 404 || message.includes('404') || msgLower.includes('not found');
+      const is401 = status === 401 || message.includes('401') || msgLower.includes('unauthorized');
+      const is429 = status === 429 || message.includes('429') || msgLower.includes('too many requests');
 
       if (is404) {
-        console.error(`❌ [LLM 404 NOT FOUND ERROR] Model '${modelName}' or endpoint '${baseURL || 'default'}' returned 404 Not Found. Non-retryable error. Falling back immediately.`);
+        console.error(`❌ [LLM 404] Model '${modelName}' veya endpoint '${baseURL || 'default'}' 404 döndürdü. Fallback.`);
         return null;
       }
       if (is401) {
-        console.error(`❌ [LLM 401 UNAUTHORIZED ERROR] Invalid API Key or Unauthorized endpoint. Non-retryable error. Falling back immediately.`);
+        console.error(`❌ [LLM 401] Geçersiz API anahtarı veya yetkisiz endpoint. Fallback.`);
+        return null;
+      }
+      if (is429) {
+        // Normal 429 (RPM limit) — Devre kesiciyi devreye al ve retry yapmadan çık
+        tripCircuitBreaker(err);
         return null;
       }
 
-      console.warn(`⚠️ [LLM RETRY ${attempt + 1}/${maxRetries + 1}] ${callType} API Error (Status: ${status || 'N/A'}): ${message}`);
-      
+      if (message === 'LLM_CALL_TIMEOUT') {
+        console.warn(`⏰ [LLM TIMEOUT ${attempt + 1}/${maxRetries + 1}] ${callType} isteği 12s içerisinde yanıt vermedi. Retrying/Falling back...`);
+      } else {
+        console.warn(`⚠️ [LLM RETRY ${attempt + 1}/${maxRetries + 1}] ${callType} API Error (Status: ${status || 'N/A'}): ${message}`);
+      }
+
       if (attempt < maxRetries) {
         const delay = Math.pow(2, attempt) * 1000; // 1s, 2s
         console.log(`⏳ [LLM BACKOFF] Waiting ${delay}ms before retry ${attempt + 2}/${maxRetries + 1}...`);
@@ -244,7 +384,7 @@ export function sanitizeLLMResponse(rawText, callType) {
   return cleaned;
 }
 
-function generateFallbackSummary(campId, topStatements) {
+export function generateFallbackSummary(campId, topStatements) {
   if (!topStatements || topStatements.length === 0) {
     return `Grup ${String.fromCharCode(65 + campId)}: Henüz fikir örüntüsü netleşmemiş katılımcılar.`;
   }
@@ -265,35 +405,47 @@ function generateFallbackSummary(campId, topStatements) {
 // ========================================================
 // 3. BATCHED CLUSTER SUMMARY GENERATION (Version-Tied Cache)
 // ========================================================
-export async function generateAllClusterSummaries(camps, question = '', sessionCode = 'DEFAULT', version = 1) {
+export async function generateAllClusterSummaries(camps, question = '', sessionCode = 'DEFAULT', version = 1, dirtyCampIds = null) {
   if (!camps || camps.length === 0) return {};
 
-  const campHashData = camps.map(c => ({
-    id: c.id,
-    name: c.name,
-    top: (c.topStatements || []).slice(0, 3).map(st => st.text || st.statement?.text)
-  }));
-  const cacheKey = `cluster-summaries:${sessionCode}:v${version}`;
-  const hash = generateHash({ question, campHashData, version });
+  const dirtySet = dirtyCampIds instanceof Set 
+    ? dirtyCampIds 
+    : (Array.isArray(dirtyCampIds) ? new Set(dirtyCampIds) : null);
 
-  const cached = getFromLlmCache(cacheKey, hash, sessionCode, version);
-  if (cached) return cached;
+  // dirtyCampIds verilmişse kampları dirty vs clean olarak ayır, verilmemişse tümünü dirty kabul et
+  const dirtyCamps = dirtySet ? camps.filter(c => dirtySet.has(c.id)) : camps;
+  const cleanCamps = dirtySet ? camps.filter(c => !dirtySet.has(c.id)) : [];
 
-  if (!openaiClient || process.env.LLM_DRY_RUN === 'true') {
-    const fallbacks = {};
-    camps.forEach(c => {
-      fallbacks[c.id] = generateFallbackSummary(c.id, c.topStatements);
-    });
-    setInLlmCache(cacheKey, hash, fallbacks);
-    return fallbacks;
+  const resultMap = {};
+
+  // Değişmeyen (clean) kamplar önceki özetini aynen korur
+  cleanCamps.forEach(c => {
+    resultMap[c.id] = c.summary || generateFallbackSummary(c.id, c.topStatements);
+  });
+
+  // 4. HİÇBİR KAMP DEĞİŞMEDİYSE LLM'E HİÇ GİTME
+  if (dirtyCamps.length === 0) {
+    console.log(`⚡ [INCREMENTAL SUMMARY] Oturum ${sessionCode} — Hiçbir kamp değişmedi (0 dirty), LLM çağrısı yapılmadı, tüm ${camps.length} kamp cache'ten korundu.`);
+    return resultMap;
   }
 
-  const promptClusters = camps.map((c, i) => {
+  // 6. LOGLAMA
+  const dirtyNamesStr = dirtyCamps.map((c, i) => c.name || `Grup ${String.fromCharCode(65 + (c.id !== undefined ? c.id : i))}`).join(', ');
+  console.log(`🔄 [INCREMENTAL SUMMARY] Oturum ${sessionCode} — ${camps.length} kamptan sadece ${dirtyCamps.length}'i (${dirtyNamesStr}) LLM'e gönderildi, ${cleanCamps.length} kamp cache'ten korundu.`);
+
+  if (!openaiClient || process.env.LLM_DRY_RUN === 'true') {
+    dirtyCamps.forEach(c => {
+      resultMap[c.id] = generateFallbackSummary(c.id, c.topStatements);
+    });
+    return resultMap;
+  }
+
+  const promptClusters = dirtyCamps.map((c, i) => {
     const topSts = (c.topStatements || []).slice(0, 3).map(st => `  - "${st.text || st.statement?.text}" (%${st.approvalRate || 0})`).join('\n');
     return `Grup ID ${c.id} ("${c.name || 'Grup ' + String.fromCharCode(65 + i)}"):\n${topSts}`;
   }).join('\n\n');
 
-  const prompt = `Aşağıda "${question}" konusundaki kamusal müzakere oturumunda yer alan TÜM fikir grupları ve en çok destekledikleri görüşler verilmiştir:
+  const prompt = `Aşağıda "${question}" konusundaki kamusal müzakere oturumunda yer alan fikir grupları ve en çok destekledikleri görüşler verilmiştir:
 
 ${promptClusters}
 
@@ -301,8 +453,7 @@ Görevin: Her bir fikir grubu için 1-2 cümlelik tarafsız Türkçe profil öze
 Çıktıyı SADECE aşağıdaki JSON formatında ver, başka hiçbir metin veya açıklama ekleme:
 {
   "summaries": [
-    { "campId": 0, "summary": "..." },
-    { "campId": 1, "summary": "..." }
+    { "campId": 0, "summary": "..." }
   ]
 }`;
 
@@ -316,10 +467,8 @@ Görevin: Her bir fikir grubu için 1-2 cümlelik tarafsız Türkçe profil öze
     temperature: 0.3
   };
 
-  console.log(`🌐 [LLM BATCH CALL] Requesting all ${camps.length} cluster summaries in 1 batched API request for session ${sessionCode} (v${version})...`);
   const rawResult = await executeLlmWithRetry(requestParams, 'cluster-summary');
   
-  const resultMap = {};
   if (rawResult) {
     try {
       let jsonStr = rawResult;
@@ -338,13 +487,12 @@ Görevin: Her bir fikir grubu için 1-2 cümlelik tarafsız Türkçe profil öze
     }
   }
 
-  camps.forEach(c => {
+  dirtyCamps.forEach(c => {
     if (!resultMap[c.id]) {
       resultMap[c.id] = generateFallbackSummary(c.id, c.topStatements);
     }
   });
 
-  setInLlmCache(cacheKey, hash, resultMap);
   return resultMap;
 }
 
@@ -491,11 +639,11 @@ KESİN KURALLAR:
   return generateAxisFallbackSummary(axisName, topStatements);
 }
 
-function generateAxisFallbackSummary(axisName, topStatements) {
+export function generateAxisFallbackSummary(axisName, topStatements) {
   if (!topStatements || topStatements.length === 0) {
     return axisName === 'x' ? 'Fikir Ayrışması (Boyut 1)' : 'Görüş Ayrışması (Boyut 2)';
   }
-  let firstText = topStatements[0].statement.text.replace(/["']/g, '').trim();
+  let firstText = (topStatements[0].statement?.text || topStatements[0].text || '').replace(/["']/g, '').trim();
   if (firstText.length > 30) firstText = firstText.substring(0, 27) + '...';
   return `${axisName.toUpperCase()} Ekseni: "${firstText}" Odaklılık`;
 }
@@ -509,7 +657,7 @@ export function generatePolarizationImpactDescription(impact) {
 // ========================================================
 // 4. CONSENSUS DISCOVERY WITH VERSION-TIED CACHE (Req 1 & Req 2)
 // ========================================================
-function generateRuleBasedConsensusFallback(camps, question) {
+export function generateRuleBasedConsensusFallback(camps, question) {
   if (!camps || camps.length === 0) {
     return `"${question || 'Bu müzakere'}" konusundaki oturumda henüz belirgin bir fikir grubu oluşmamıştır. Katılımcı sayısı arttıkça uzlaşı potansiyelleri analiz edilecektir.`;
   }

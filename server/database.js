@@ -15,7 +15,7 @@ class Database {
     this.initialized = this.init();
   }
 
-  markSessionMutated(sessionCode) {
+  markSessionMutated(sessionCode, mutationType = 'general') {
     if (!sessionCode) return { version: 1, lastMutatedAt: Date.now() };
     const code = sessionCode.toUpperCase();
     const currentVersion = (this.sessionVersions.get(code) || 1) + 1;
@@ -27,13 +27,100 @@ class Database {
     if (session) {
       session.version = currentVersion;
       session.lastMutatedAt = now;
+
+      if (mutationType === 'vote') {
+        session.pendingVotes = (session.pendingVotes || 0) + 1;
+        session.pendingMutationCount = (session.pendingMutationCount || 0) + 1;
+      } else if (mutationType === 'opinion') {
+        session.pendingOpinions = (session.pendingOpinions || 0) + 1;
+        session.pendingMutationCount = (session.pendingMutationCount || 0) + 1;
+      }
     }
 
     // Explicitly invalidate LLM cache for mutated session (Req 3)
     invalidateLlmCacheForSession(code);
 
-    console.log(`🔄 [SESSION MUTATED] Session ${code} -> Version: v${currentVersion}, MutatedAt: ${new Date(now).toLocaleTimeString()}`);
+    console.log(`🔄 [SESSION MUTATED] Session ${code} (${mutationType}) -> Version: v${currentVersion}, MutatedAt: ${new Date(now).toLocaleTimeString()}`);
     return { version: currentVersion, lastMutatedAt: now };
+  }
+
+  resetPendingMutations(sessionCode) {
+    if (!sessionCode) return;
+    const code = sessionCode.toUpperCase();
+    const session = this.sessions.get(code);
+    if (session) {
+      session.pendingMutationCount = 0;
+      session.pendingVotes = 0;
+      session.pendingOpinions = 0;
+    }
+  }
+
+  // ─── DIRTY CAMPS TRACKING (Kısmi/Artımlı Küme Özeti Üretimi) ─────────────
+  markCampDirty(sessionCode, campId) {
+    if (!sessionCode || campId === undefined || campId === null) return;
+    const code = sessionCode.toUpperCase();
+    const session = this.sessions.get(code);
+    if (session) {
+      const numericId = Number(campId);
+      const k = session.targetK || 3;
+      if (numericId >= k) return; // Geçersiz kamp ID'lerini yok say
+
+      if (!session.dirtyCampTimestamps) session.dirtyCampTimestamps = new Map();
+      if (!session.dirtyCamps) session.dirtyCamps = new Set();
+      
+      const now = Date.now();
+      session.dirtyCampTimestamps.set(numericId, now);
+      session.dirtyCamps.add(numericId);
+    }
+  }
+
+  markAllCampsDirty(sessionCode) {
+    if (!sessionCode) return;
+    const code = sessionCode.toUpperCase();
+    const session = this.sessions.get(code);
+    if (session) {
+      const k = session.targetK || 3;
+      const now = Date.now();
+      if (!session.dirtyCampTimestamps) session.dirtyCampTimestamps = new Map();
+      if (!session.dirtyCamps) session.dirtyCamps = new Set();
+      
+      session.dirtyCampTimestamps.clear();
+      session.dirtyCamps.clear();
+      for (let i = 0; i < k; i++) {
+        session.dirtyCampTimestamps.set(i, now);
+        session.dirtyCamps.add(i);
+      }
+    }
+  }
+
+  getDirtyCamps(sessionCode) {
+    if (!sessionCode) return new Set();
+    const code = sessionCode.toUpperCase();
+    const session = this.sessions.get(code);
+    return session?.dirtyCamps ? new Set(session.dirtyCamps) : new Set();
+  }
+
+  clearDirtyCamps(sessionCode, campIds, snapshotTime = null) {
+    if (!sessionCode) return;
+    const code = sessionCode.toUpperCase();
+    const session = this.sessions.get(code);
+    if (session) {
+      const idsToClear = Array.isArray(campIds)
+        ? campIds
+        : (campIds instanceof Set ? Array.from(campIds) : []);
+
+      idsToClear.forEach(id => {
+        const numericId = Number(id);
+        const lastDirtyTime = session.dirtyCampTimestamps?.get(numericId) || 0;
+        
+        // Snapshot zamanı verilmişse: Eğer snapshot sonrası kampa YENİ bir mutasyon gelmediyse temizle.
+        // Eğer LLM çağrısı sürerken kampa yeni mutasyon geldiyse (lastDirtyTime > snapshotTime) SİLME!
+        if (snapshotTime === null || lastDirtyTime <= snapshotTime) {
+          session.dirtyCampTimestamps?.delete(numericId);
+          session.dirtyCamps?.delete(numericId);
+        }
+      });
+    }
   }
 
   getSessionMutationInfo(sessionCode) {
@@ -534,7 +621,13 @@ class Database {
     if (![1, -1, 0].includes(voteValue)) return false;
 
     participant.votes[statementId] = voteValue;
-    this.markSessionMutated(sessionCode);
+    this.markSessionMutated(sessionCode, 'vote');
+
+    // Oy veren katılımcının ait olduğu kampı dirty (kirli) olarak işaretle
+    const point = session.analysis?.points?.find(pt => pt.id === participantId || (participant.nickname && pt.nickname === participant.nickname));
+    if (point && point.campId !== undefined && point.campId !== null) {
+      this.markCampDirty(sessionCode, point.campId);
+    }
 
     if (this.isPrismaActive) {
       this.prisma.vote.upsert({
@@ -575,10 +668,11 @@ class Database {
 
     if (approved) {
       session.statements.push(statement);
+      this.markSessionMutated(sessionCode, 'opinion');
     } else {
       session.moderationQueue.push(statement);
+      this.markSessionMutated(sessionCode, 'general');
     }
-    this.markSessionMutated(sessionCode);
 
     if (this.isPrismaActive) {
       this.prisma.opinion.create({
@@ -610,7 +704,7 @@ class Database {
       statement.approved = true;
       this.logAdminAction(sessionCode, 'APPROVE_OPINION', `Görüş onaylandı: "${statement.text.substring(0, 30)}..."`);
       session.statements.push(statement);
-      this.markSessionMutated(sessionCode);
+      this.markSessionMutated(sessionCode, 'opinion');
 
       if (this.isPrismaActive) {
         this.prisma.opinion.update({
@@ -634,7 +728,7 @@ class Database {
       const statement = session.moderationQueue.splice(idx, 1)[0];
       statement.approved = false;
       this.logAdminAction(sessionCode, 'REJECT_OPINION', `Görüş reddedildi: "${statement.text.substring(0, 30)}..."`);
-      this.markSessionMutated(sessionCode);
+      this.markSessionMutated(sessionCode, 'general');
 
       if (this.isPrismaActive) {
         this.prisma.opinion.update({
@@ -655,7 +749,7 @@ class Database {
 
     session.question = newQuestion;
     this.logAdminAction(sessionCode, 'UPDATE_QUESTION', `Soru güncellendi: ${newQuestion}`);
-    this.markSessionMutated(sessionCode);
+    this.markSessionMutated(sessionCode, 'structural');
 
     if (this.isPrismaActive) {
       this.prisma.session.update({
@@ -1002,7 +1096,47 @@ class Database {
 
     session.targetK = targetK;
     this.logAdminAction(sessionCode, 'UPDATE_CAMPS_COUNT', `Hedef kamp sayısı değiştirildi: ${targetK}`);
-    this.markSessionMutated(sessionCode);
+    this.markSessionMutated(sessionCode, 'structural');
+
+    // K değeri azaltıldığında var olmayan eski kamp ID'lerini temizle
+    if (session.dirtyCampTimestamps) {
+      for (const campId of Array.from(session.dirtyCampTimestamps.keys())) {
+        if (campId >= targetK) {
+          session.dirtyCampTimestamps.delete(campId);
+        }
+      }
+    }
+    if (session.dirtyCamps) {
+      for (const campId of Array.from(session.dirtyCamps)) {
+        if (campId >= targetK) {
+          session.dirtyCamps.delete(campId);
+        }
+      }
+    }
+
+    if (session.analysis) {
+      if (Array.isArray(session.analysis.camps)) {
+        session.analysis.camps = session.analysis.camps.filter(c => c.id < targetK);
+      }
+      if (session.analysis.campApprovalRates) {
+        Object.keys(session.analysis.campApprovalRates).forEach(campId => {
+          if (Number(campId) >= targetK) {
+            delete session.analysis.campApprovalRates[campId];
+          }
+        });
+      }
+    }
+
+    if (session.customCampNames) {
+      Object.keys(session.customCampNames).forEach(campId => {
+        if (Number(campId) >= targetK) {
+          delete session.customCampNames[campId];
+        }
+      });
+    }
+
+    // 0..(targetK-1) aralığındaki geçerli kampları kirli say
+    this.markAllCampsDirty(sessionCode);
 
     if (this.isPrismaActive) {
       this.prisma.session.update({
@@ -1025,7 +1159,7 @@ class Database {
     }
     session.customCampNames[campId] = newName.trim();
     this.logAdminAction(sessionCode, 'RENAME_CAMP', `Fikir kampı [${campId}] yeniden adlandırıldı: "${newName.trim()}"`);
-    this.markSessionMutated(sessionCode);
+    this.markSessionMutated(sessionCode, 'structural');
 
     if (this.isPrismaActive) {
       this.prisma.session.update({
@@ -1038,8 +1172,10 @@ class Database {
 
   /**
    * Oturumun kutuplaşma trend geçmişine yeni bir veri ekler.
+   * Throttle: son kayıttan bu yana en az 90 saniye geçmeli VEYA değer >2% değişmeli.
+   * Limit: 100 kayıt (FIFO dairesel tampon).
    */
-  addPolarizationHistoryEntry(sessionCode, value) {
+  addPolarizationHistoryEntry(sessionCode, value, participantCount = 0, triggerReason = 'mutation', isSimulated = false) {
     const session = this.sessions.get(sessionCode);
     if (!session) return false;
 
@@ -1047,16 +1183,37 @@ class Database {
       session.polarizationHistory = [];
     }
 
+    const now = Date.now();
+    const newVal = parseFloat(value);
+    const simulatedFlag = Boolean(isSimulated);
+
+    // Throttle: çok sık kayıt birikmesini önle
+    if (session.polarizationHistory.length > 0) {
+      const last = session.polarizationHistory[session.polarizationHistory.length - 1];
+      const timeSinceLastSec = Math.round((now - last.t) / 1000);
+      const valueDelta = Math.abs(newVal - last.v).toFixed(1);
+      // Son kayıttan bu yana 90 saniyeden az geçmiş VE değer 2%'den az değişmişse atla
+      if (now - last.t < 90 * 1000 && parseFloat(valueDelta) < 2) {
+        console.log(`⏭️ [POLARIZATION SKIP${simulatedFlag ? ' — SİMÜLASYON' : ''}] Oturum ${sessionCode} — son kayıttan ${timeSinceLastSec}s geçti, değişim %${valueDelta} — eşik altında, atlandı`);
+        return false;
+      }
+    }
+
     const entry = {
-      t: Date.now(),
-      v: parseFloat(value)
+      t: now,
+      v: newVal,
+      n: participantCount,
+      isSimulated: simulatedFlag
     };
 
-    // Zaman serisini ekle (maksimum son 50 analiz saklanır)
-    session.polarizationHistory.push(entry);
-    if (session.polarizationHistory.length > 50) {
+    // Circular buffer (FIFO): Maksimum 100 kayıt saklanır. 100'e ulaşıldığında en eski kayıt silinir.
+    while (session.polarizationHistory.length >= 100) {
       session.polarizationHistory.shift();
     }
+    session.polarizationHistory.push(entry);
+
+    const logTag = simulatedFlag ? ' 📊 [POLARIZATION LOG — SİMÜLASYON]' : '📊 [POLARIZATION LOG]';
+    console.log(`${logTag} Oturum ${sessionCode} — tetikleyici: ${triggerReason} — kutuplaşma: %${newVal.toFixed(1)} — throttle: geçti`);
 
     if (this.isPrismaActive) {
       this.prisma.session.update({

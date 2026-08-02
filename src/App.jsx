@@ -294,7 +294,12 @@ export default function App() {
           });
         }
 
+        if (parsed.token && !localStorage.getItem(`session_token_${parsed.sessionCode || 'DEFAULT'}`)) {
+          localStorage.setItem(`session_token_${parsed.sessionCode || 'DEFAULT'}`, parsed.token);
+        }
+
         const savedToken = localStorage.getItem(`session_token_${parsed.sessionCode || 'DEFAULT'}`) ||
+                           parsed.token ||
                            modToken ||
                            adminToken;
         socket.emit('join-session', { sessionCode: parsed.sessionCode || 'DEFAULT', token: savedToken });
@@ -340,10 +345,14 @@ export default function App() {
     socketRef.current.emit('join-session', { sessionCode: code, token });
     socketRef.current.emit('register-participant', { sessionCode: code, nickname, justification }, (res) => {
       if (res.success) {
+        if (res.token) {
+          localStorage.setItem(`session_token_${code}`, res.token);
+        }
         const newPart = {
           id: res.participantId,
           nickname: res.nickname,
           sessionCode: code,
+          token: res.token || null,
           votes: {}
         };
         setParticipant(newPart);
@@ -731,6 +740,7 @@ export default function App() {
             onRenameCamp={handleRenameCamp}
             lang={lang}
             sessionsOverview={sessionsOverview}
+            analysis={sessionState.analysis}
           />
         )}
 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Users, FileText, Split, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Users, FileText, Split, CheckCircle2, AlertCircle, Shield } from 'lucide-react';
 import { t } from '../i18n';
 
 const getCampColor = (campId, totalCamps) => {
@@ -17,6 +17,7 @@ export default function LiveScreen({ question, analysis, stats, status = 'active
   const camps = isInsufficient ? [] : (analysis?.camps || []);
   const bridges = isInsufficient ? [] : (analysis?.bridges || []);
   const polarisability = isInsufficient ? 0 : (analysis?.polarisability || 0);
+  const minorityInsights = isInsufficient ? [] : (analysis?.minorityInsights || []);
 
   // Varyans açıklama oranı uyarısı
   const varianceExplained = analysis?.varianceExplained || [];
@@ -324,6 +325,65 @@ export default function LiveScreen({ question, analysis, stats, status = 'active
               );
             })}
           </div>
+        </div>
+
+        {/* Azınlık Görüşleri Paneli (Minority Opinion Shield) */}
+        <div style={{ marginTop: '1.25rem' }}>
+          <h2 style={{
+            fontSize: '1.1rem',
+            borderBottom: '1px solid rgba(245, 158, 11, 0.3)',
+            paddingBottom: '0.5rem',
+            marginBottom: '0.6rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.4rem',
+            color: '#f59e0b'
+          }}>
+            <Shield size={18} style={{ color: '#f59e0b' }} />
+            {lang === 'tr' ? 'Az Duyulan Ama Güçlü Argümanlar' : 'Underrepresented Strong Arguments'}
+          </h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: '0.75rem' }}>
+            {lang === 'tr'
+              ? 'Bu görüşler az oy almış ancak güçlü gerekçe içeriyor. Değerlendirmeye değer olabilir.'
+              : 'These opinions received few votes but contain strong reasoning. Worth considering.'}
+          </p>
+
+          {minorityInsights.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+              {minorityInsights.map((insight, idx) => (
+                <div key={insight.id || idx} style={{
+                  background: 'rgba(245, 158, 11, 0.06)',
+                  border: '1px solid rgba(245, 158, 11, 0.25)',
+                  borderLeft: '3px solid #f59e0b',
+                  borderRadius: '8px',
+                  padding: '0.75rem 0.9rem'
+                }}>
+                  <div style={{ fontSize: '0.88rem', lineHeight: 1.45, marginBottom: '0.4rem' }}>
+                    "{insight.text}"
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.65rem', fontSize: '0.74rem', color: 'var(--text-muted)', flexWrap: 'wrap' }}>
+                    <span style={{
+                      background: 'rgba(245, 158, 11, 0.15)',
+                      color: '#f59e0b',
+                      padding: '0.12rem 0.45rem',
+                      borderRadius: '4px',
+                      fontWeight: 600
+                    }}>
+                      🧠 {lang === 'tr' ? 'Gerekçe Kalitesi' : 'Quality'}: %{insight.qualityScore}
+                    </span>
+                    <span>🗳️ {insight.voteCount} {lang === 'tr' ? 'Oy' : 'Votes'}</span>
+                    <span>👍 %{insight.approvalRate ?? Math.round((insight.agreeCount / Math.max(1, insight.voteCount))*100)} {lang === 'tr' ? 'Onay' : 'Approval'}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ padding: '0.85rem', border: '1px dashed rgba(245, 158, 11, 0.25)', borderRadius: '8px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+              💡 {lang === 'tr'
+                ? 'Henüz azınlık görüşü tespiti için yeterli gerekçeli görüş verisi oluşmadı.'
+                : 'No underrepresented strong arguments detected yet.'}
+            </div>
+          )}
         </div>
       </div>
 

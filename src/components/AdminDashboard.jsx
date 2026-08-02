@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { HelpCircle, Users, Check, X, Settings, FileText, Play, Shield, AlertTriangle, RefreshCw, Send, Sparkles } from 'lucide-react';
+import { HelpCircle, Users, Check, X, Settings, FileText, Play, Shield, AlertTriangle, RefreshCw, Send, Sparkles, TrendingUp, TrendingDown } from 'lucide-react';
 import { t } from '../i18n';
 
 export default function AdminDashboard({ 
@@ -25,7 +25,8 @@ export default function AdminDashboard({
   aiAccuracy = 0,
   sessionsOverview = [],
   activeSessionCode = 'DEFAULT',
-  onSelectSession
+  onSelectSession,
+  analysis = null
 }) {
   const [newQuestion, setNewQuestion] = useState(question);
   const [simCount, setSimCount] = useState(100);
@@ -38,7 +39,13 @@ export default function AdminDashboard({
   const [consensusError, setConsensusError] = useState('');
   const [discoveringConsensus, setDiscoveringConsensus] = useState(false);
   const [dataFreshness, setDataFreshness] = useState(null); // { isFresh: boolean, version: number }
+  const [quotaWarning, setQuotaWarning] = useState(false);
   const lastConsensusClickRef = React.useRef(0);
+
+  // Kutuplaşma Trendi state'leri
+  const [polarizationHistory, setPolarizationHistory] = useState([]);
+  const [hoveredPtAdmin, setHoveredPtAdmin] = useState(null);
+  const [showSimulated, setShowSimulated] = useState(false);
 
   const fetchActionLogs = () => {
     const token = localStorage.getItem('admin_token');
@@ -58,11 +65,28 @@ export default function AdminDashboard({
   useEffect(() => {
     fetchActionLogs();
     const interval = setInterval(fetchActionLogs, 5000);
-    // Oturum değiştiğinde uzlaşı keşif panelini sıfırla
     setConsensusResult('');
     setConsensusError('');
     setDataFreshness(null);
     return () => clearInterval(interval);
+  }, [activeSessionCode]);
+
+  useEffect(() => {
+    setPolarizationHistory([]);
+    setHoveredPtAdmin(null);
+    const token = localStorage.getItem('admin_token');
+    const code = activeSessionCode || 'DEFAULT';
+    const fetchHistory = () => {
+      fetch(`/api/sessions/${code}/polarization-history`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      })
+      .then(r => r.json())
+      .then(d => { if (d.success) setPolarizationHistory(d.history || []); })
+      .catch(() => {});
+    };
+    fetchHistory();
+    const hInterval = setInterval(fetchHistory, 30000);
+    return () => clearInterval(hInterval);
   }, [activeSessionCode]);
 
   // Kamp ismi düzenleme state'leri
@@ -204,26 +228,43 @@ export default function AdminDashboard({
     setDiscoveringConsensus(true);
 
     const token = localStorage.getItem('admin_token') || localStorage.getItem(`moderator_token_${activeSessionCode}`);
+
+    // Client-side AbortController ile 20 saniyelik timeout (Req 4)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000);
+
     try {
       const res = await fetch(`/api/sessions/${activeSessionCode}/discover-consensus`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
-        }
+        },
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
+
       const data = await res.json();
       if (data.success) {
         setConsensusResult(data.consensusPotential);
         if (data.dataFreshness) {
           setDataFreshness(data.dataFreshness);
         }
+        if (data.isQuotaExhausted) {
+          setQuotaWarning(true);
+        }
       } else {
         setConsensusError(data.message || (lang === 'tr' ? 'Uzlaşı potansiyeli keşfedilemedi.' : 'Failed to discover consensus.'));
       }
     } catch (err) {
-      setConsensusError(lang === 'tr' ? 'Şu an uzlaşı potansiyeli analiz edilemedi.' : 'Currently unable to analyze consensus potential.');
+      clearTimeout(timeoutId);
+      if (err.name === 'AbortError') {
+        setConsensusError(lang === 'tr' ? 'İstek zaman aşımına uğradı (20s). Kural tabanlı sonuç gösteriliyor.' : 'Request timed out (20s). Showing rule-based result.');
+      } else {
+        setConsensusError(lang === 'tr' ? 'Şu an uzlaşı potansiyeli analiz edilemedi.' : 'Currently unable to analyze consensus potential.');
+      }
     } finally {
+      // ⚠️ İSTİSNASIZ GARANTİ: Loading state HER ZAMAN kaldırılır!
       setDiscoveringConsensus(false);
     }
   };
@@ -409,6 +450,224 @@ export default function AdminDashboard({
         )}
       </div>
 
+      {/* ═══════════════════════════════════════════════════════════════
+           Kutuplaşma Trendi Bento Kartı
+      ════════════════════════════════════════════════════════════════ */}
+      <div className="glass-panel" style={{ width: '100%' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <div>
+            <h2 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+              📈 {lang === 'tr' ? 'Kutuplaşma Trendi' : 'Polarization Trend'}
+              <span style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid var(--border-light)', borderRadius: '999px', padding: '0.1rem 0.6rem', fontSize: '0.72rem', color: 'var(--color-secondary)', fontWeight: 600 }}>
+                {activeSessionCode}
+              </span>
+            </h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+              {lang === 'tr' ? 'Seçili oturumun kutuplaşma yüzdesinin zamana göre değişimi.' : 'Polarization percentage over time for the selected session.'}
+            </p>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.8rem', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.05)', padding: '0.25rem 0.65rem', borderRadius: '6px', border: '1px solid var(--border-light)' }}>
+              <input
+                type="checkbox"
+                checked={showSimulated}
+                onChange={e => setShowSimulated(e.target.checked)}
+                style={{ cursor: 'pointer', accentColor: 'var(--color-secondary)' }}
+              />
+              <span>🤖 {lang === 'tr' ? 'Simülasyon verilerini göster' : 'Show simulation data'}</span>
+            </label>
+            {/* Trend Badge */}
+            {polarizationHistory.length >= 2 && (() => {
+              const activeHist = showSimulated ? polarizationHistory : polarizationHistory.filter(pt => !pt.isSimulated);
+              if (activeHist.length < 2) return null;
+              const first = activeHist[0].v;
+              const last  = activeHist[activeHist.length - 1].v;
+              const diff  = last - first;
+              if (diff > 1) return (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '999px', padding: '0.3rem 0.85rem', fontSize: '0.82rem', fontWeight: 700 }}>
+                  <TrendingUp size={14} /> {lang === 'tr' ? `↑ Artıyor (+${diff.toFixed(1)}%)` : `↑ Rising (+${diff.toFixed(1)}%)`}
+                </span>
+              );
+              if (diff < -1) return (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', background: 'rgba(34,197,94,0.1)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '999px', padding: '0.3rem 0.85rem', fontSize: '0.82rem', fontWeight: 700 }}>
+                  <TrendingDown size={14} /> {lang === 'tr' ? `↓ Azalıyor (${diff.toFixed(1)}%)` : `↓ Decreasing (${diff.toFixed(1)}%)`}
+                </span>
+              );
+              return (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', background: 'rgba(100,116,139,0.1)', color: '#94a3b8', border: '1px solid rgba(100,116,139,0.2)', borderRadius: '999px', padding: '0.3rem 0.85rem', fontSize: '0.82rem', fontWeight: 700 }}>
+                  → {lang === 'tr' ? 'Sabit' : 'Stable'}
+                </span>
+              );
+            })()}
+          </div>
+        </div>
+
+        {(() => {
+          const hist = showSimulated ? polarizationHistory : polarizationHistory.filter(pt => !pt.isSimulated);
+          if (hist.length < 2) return (
+            <div style={{ padding: '2.5rem 1rem', border: '1px dashed var(--border-light)', borderRadius: '8px', textAlign: 'center', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ fontSize: '2rem', opacity: 0.4 }}>📈</span>
+              <p style={{ fontSize: '0.85rem', fontWeight: 500 }}>
+                {lang === 'tr' ? 'Gösterilecek en az 2 gerçek katılımcı analiz kaydı gerekir.' : 'At least 2 real participant analysis snapshots required.'}
+              </p>
+              <p style={{ fontSize: '0.78rem', opacity: 0.7 }}>
+                {lang === 'tr' ? 'Katılımcılar oy verdikçe sistem otomatik kaydeder.' : 'The system records automatically as participants vote.'}
+              </p>
+            </div>
+          );
+          const W = 560, H = 165, pL = 42, pR = 14, pT = 14, pB = 36;
+          const cW = W - pL - pR, cH = H - pT - pB;
+          const toX = i => pL + (i / (hist.length - 1)) * cW;
+          const toY = v => (pT + cH) - (Math.min(100, Math.max(0, v)) / 100) * cH;
+          const pts = hist.map((pt, i) => ({ x: toX(i), y: toY(pt.v), val: pt.v, time: pt.t, n: pt.n || 0 }));
+          const linePath = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
+          const areaPath = `${linePath} L ${pts[pts.length-1].x.toFixed(1)} ${pT + cH} L ${pL} ${pT + cH} Z`;
+          const gradId = `polGrad_${activeSessionCode}`;
+          // X-axis time labels: first, middle, last
+          const timeLabels = [0, Math.floor((hist.length - 1) / 2), hist.length - 1].map(idx => ({
+            x: toX(idx),
+            label: new Date(hist[idx].t).toLocaleTimeString(lang === 'tr' ? 'tr-TR' : 'en-US', { hour: '2-digit', minute: '2-digit' })
+          }));
+
+          return (
+            <div style={{ position: 'relative', background: 'rgba(0,0,0,0.15)', borderRadius: '10px', padding: '0.5rem 0.25rem 0.25rem' }}>
+              {hoveredPtAdmin && (
+                <div style={{
+                  position: 'absolute',
+                  left: `${Math.min(hoveredPtAdmin.x / W * 100, 78)}%`,
+                  top: '8px',
+                  background: 'rgba(15,10,28,0.97)',
+                  border: '1px solid var(--border-glow-active)',
+                  borderRadius: '8px',
+                  padding: '0.45rem 0.8rem',
+                  zIndex: 20,
+                  pointerEvents: 'none',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+                  fontSize: '0.78rem',
+                  minWidth: '130px'
+                }}>
+                  <div style={{ fontWeight: 700, color: 'var(--color-secondary)', fontSize: '1rem' }}>%{hoveredPtAdmin.val.toFixed(1)}</div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>
+                    {new Date(hoveredPtAdmin.time).toLocaleTimeString(lang === 'tr' ? 'tr-TR' : 'en-US')}
+                  </div>
+                  {hoveredPtAdmin.n > 0 && (
+                    <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem', marginTop: '0.15rem' }}>
+                      {hoveredPtAdmin.n} {lang === 'tr' ? 'katılımcı' : 'participants'}
+                    </div>
+                  )}
+                  {hoveredPtAdmin.isSimulated && (
+                    <div style={{ color: '#f59e0b', fontSize: '0.7rem', fontWeight: 700, marginTop: '0.15rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                      🤖 {lang === 'tr' ? 'Simülasyon Kaydı' : 'Simulated Entry'}
+                    </div>
+                  )}
+                </div>
+              )}
+              <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block', overflow: 'visible' }}>
+                <defs>
+                  <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#6366f1" stopOpacity="0.35" />
+                    <stop offset="100%" stopColor="#6366f1" stopOpacity="0.02" />
+                  </linearGradient>
+                </defs>
+                {/* Grid lines & Y labels */}
+                {[0, 25, 50, 75, 100].map(level => {
+                  const y = toY(level);
+                  return (
+                    <g key={level}>
+                      <line x1={pL} y1={y} x2={W - pR} y2={y} stroke="rgba(255,255,255,0.07)" strokeWidth={level === 0 || level === 100 ? 1 : 0.7} strokeDasharray={level > 0 && level < 100 ? '4,4' : undefined} />
+                      <text x={pL - 7} y={y + 3.5} textAnchor="end" fontSize="9" fill="#64748b">%{level}</text>
+                    </g>
+                  );
+                })}
+                {/* Area fill */}
+                <path d={areaPath} fill={`url(#${gradId})`} />
+                {/* Line */}
+                <path d={linePath} fill="none" stroke="#818cf8" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+                {/* Data points */}
+                {pts.map((pt, i) => {
+                  const isSim = hist[i]?.isSimulated;
+                  const isHovered = hoveredPtAdmin && hoveredPtAdmin.time === pt.time;
+                  return (
+                    <circle
+                      key={i}
+                      cx={pt.x} cy={pt.y}
+                      r={isHovered ? 6 : 3.5}
+                      fill={isHovered ? (isSim ? '#fbbf24' : '#a5b4fc') : (isSim ? 'none' : '#6366f1')}
+                      stroke={isSim ? '#f59e0b' : 'rgba(15,10,28,0.8)'}
+                      strokeWidth={isSim ? 2 : 1.5}
+                      strokeDasharray={isSim ? '2,1' : undefined}
+                      style={{ cursor: 'pointer' }}
+                      onMouseEnter={() => setHoveredPtAdmin({ ...pt, isSimulated: isSim })}
+                      onMouseLeave={() => setHoveredPtAdmin(null)}
+                    />
+                  );
+                })}
+                {/* X-axis time labels */}
+                {timeLabels.map((tl, i) => (
+                  <text key={i} x={tl.x} y={H - 4} textAnchor="middle" fontSize="9" fill="#64748b">{tl.label}</text>
+                ))}
+                {/* X-axis baseline */}
+                <line x1={pL} y1={pT + cH} x2={W - pR} y2={pT + cH} stroke="rgba(255,255,255,0.12)" strokeWidth={1} />
+              </svg>
+              <div style={{ display: 'flex', gap: '1.5rem', justifyContent: 'center', marginTop: '0.25rem', fontSize: '0.78rem', color: 'var(--text-muted)', flexWrap: 'wrap' }}>
+                <span>▶ {lang === 'tr' ? 'Başlangıç' : 'Start'}: <strong style={{ color: 'var(--text-main)' }}>%{hist[0].v.toFixed(1)}</strong></span>
+                <span>■ {lang === 'tr' ? 'Güncel' : 'Current'}: <strong style={{ color: '#818cf8' }}>%{hist[hist.length-1].v.toFixed(1)}</strong></span>
+                <span>{hist.length} {lang === 'tr' ? 'veri noktası' : 'data points'}</span>
+              </div>
+            </div>
+          );
+        })()}
+      </div>
+
+      {/* Azınlık Görüşleri Paneli (Minority Opinion Shield) */}
+      {(() => {
+        const minorityInsights = analysis?.minorityInsights || [];
+        return (
+          <div className="glass-panel" style={{ width: '100%', marginTop: '0.85rem' }}>
+            <h2 style={{ fontSize: '1.2rem', marginBottom: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#f59e0b' }}>
+              <Shield size={18} style={{ color: '#f59e0b' }} />
+              {lang === 'tr' ? 'Az Duyulan Ama Güçlü Argümanlar' : 'Underrepresented Strong Arguments'}
+            </h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginBottom: '0.65rem' }}>
+              {lang === 'tr' 
+                ? 'Gerekçe kalitesi yüksek ancak henüz geniş kitlelerce oylanmamış veya azınlıkta kalan değerli fikirler.' 
+                : 'High quality reasoning opinions that are underrepresented or have received fewer votes.'}
+            </p>
+            
+            {minorityInsights.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                {minorityInsights.map((insight, idx) => (
+                  <div key={insight.id || idx} style={{
+                    background: 'rgba(245, 158, 11, 0.06)',
+                    border: '1px solid rgba(245, 158, 11, 0.25)',
+                    borderLeft: '4px solid #f59e0b',
+                    borderRadius: '8px',
+                    padding: '0.75rem 0.9rem'
+                  }}>
+                    <div style={{ fontSize: '0.88rem', lineHeight: 1.45, marginBottom: '0.4rem', color: 'var(--text-main)' }}>
+                      "{insight.text}"
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.75rem', fontSize: '0.75rem', color: 'var(--text-muted)', flexWrap: 'wrap' }}>
+                      <span style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', padding: '0.15rem 0.5rem', borderRadius: '4px', fontWeight: 600 }}>
+                        🧠 {lang === 'tr' ? 'Gerekçe Kalitesi' : 'Quality'}: %{insight.qualityScore}
+                      </span>
+                      <span>🗳️ {insight.voteCount} {lang === 'tr' ? 'Oy' : 'Votes'}</span>
+                      <span>👍 %{insight.approvalRate ?? Math.round((insight.agreeCount / Math.max(1, insight.voteCount))*100)} {lang === 'tr' ? 'Onay' : 'Approval'}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ padding: '0.85rem', border: '1px dashed rgba(245, 158, 11, 0.25)', borderRadius: '8px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+                💡 {lang === 'tr' 
+                  ? 'Henüz azınlık görüşü tespiti için yeterli oylama/gerekçe verisi yok (katılımcılar gerekçeli görüş ekledikçe otomatik tespit edilir).' 
+                  : 'No underrepresented strong arguments detected yet.'}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {/* Yöneticilerin Son Değişiklikleri Günlüğü */}
       <div className="glass-panel" style={{ width: '100%', marginTop: '1rem' }}>
         <h2 style={{ fontSize: '1.25rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -485,11 +744,23 @@ export default function AdminDashboard({
             <Sparkles size={18} className="text-secondary" />
             {lang === 'tr' ? 'Uzlaşı Potansiyeli Keşif Paneli' : 'Consensus Potential Discovery'}
           </h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-            {lang === 'tr' 
-              ? 'Farklı fikir grupları arasındaki ortak kaygıları, birleştirici temaları ve uzlaşı potansiyellerini yapay zeka yardımıyla analiz edin.' 
-              : 'Analyze common concerns, unifying themes, and consensus potentials between different opinion groups using AI.'}
-          </p>
+          {quotaWarning && (
+            <div style={{ 
+              background: 'rgba(245, 158, 11, 0.12)', 
+              border: '1px solid rgba(245, 158, 11, 0.35)', 
+              padding: '0.65rem 0.85rem', 
+              borderRadius: 'var(--radius-md)', 
+              color: '#f59e0b', 
+              fontSize: '0.82rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              fontWeight: 600
+            }}>
+              <span>⚠️</span>
+              <span>{lang === 'tr' ? 'Günlük API kotası dolmuş olabilir, kural tabanlı analiz aktif.' : 'Daily API quota limit may be reached, rule-based analysis is active.'}</span>
+            </div>
+          )}
           
           {consensusResult && (
             <div style={{ 

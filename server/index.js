@@ -13,14 +13,19 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 
 import { db } from './database.js';
-import { calculatePCA, runKMeansWithStability, analyzeCampsAndBridges, alignCentroids, calculatePolarisability, calculateKMeans } from './algorithms.js';
+import { calculatePCA, runKMeansWithStability, analyzeCampsAndBridges, alignCentroids, calculatePolarisability, calculateKMeans, getCampAssignmentExplanation } from './algorithms.js';
 import { authenticateAdmin, passwordRateLimiter, checkParticipantAccess, checkModerator, verifySessionToken, requireSessionOwnership, isSessionOwner } from './middleware/auth.middleware.js';
-import { generateClusterSummary, evaluateOpinionContent, generateAxisLabel, generatePolarizationImpactDescription, discoverConsensusPotential, generateExecutiveSummary, sanitizeLLMResponse } from './services/llm.service.js';
+import { generateClusterSummary, generateAllClusterSummaries, evaluateOpinionContent, generateAxisLabel, generatePolarizationImpactDescription, discoverConsensusPotential, generateExecutiveSummary, sanitizeLLMResponse, generateFallbackSummary, generateAxisFallbackSummary, generateRuleBasedConsensusFallback, getLlmQuotaStatus, resetRpdQuotaStatus } from './services/llm.service.js';
+import { calculateReasoningQualityScore } from './services/quality.service.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const JWT_SECRET = process.env.JWT_SECRET || 'kamusal_alan_gizli_anahtar';
+
+// Yapılandırılabilir mutasyon eşik değerleri (PROJECT_CONSTRAINTS & Rate Limit Koruması)
+const MUTATION_THRESHOLD_VOTES = parseInt(process.env.MUTATION_THRESHOLD_VOTES || '5', 10);
+const MUTATION_THRESHOLD_OPINIONS = parseInt(process.env.MUTATION_THRESHOLD_OPINIONS || '2', 10);
 
 const app = express();
 const httpServer = createServer(app);
@@ -272,7 +277,7 @@ app.post('/api/sessions/:code/join', passwordRateLimiter, async (req, res) => {
     }
 
     if (session.visibility === 'PUBLIC') {
-      const accessToken = jwt.sign({ type: 'participant_access', sessionCode: upperCode }, JWT_SECRET, { expiresIn: '24h' });
+      const accessToken = jwt.sign({ type: 'participant_access', sessionCode: upperCode, participantId: req.body?.participantId || null }, JWT_SECRET, { expiresIn: '24h' });
       return res.json({ success: true, accessToken });
     }
 
@@ -289,7 +294,7 @@ app.post('/api/sessions/:code/join', passwordRateLimiter, async (req, res) => {
       return res.status(401).json({ success: false, message: 'Hatalı şifre.' });
     }
 
-    const accessToken = jwt.sign({ type: 'participant_access', sessionCode: upperCode }, JWT_SECRET, { expiresIn: '24h' });
+    const accessToken = jwt.sign({ type: 'participant_access', sessionCode: upperCode, participantId: req.body?.participantId || null }, JWT_SECRET, { expiresIn: '24h' });
     res.json({ success: true, accessToken });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -441,7 +446,7 @@ app.patch('/api/sessions/:code/opinions/:id/status', requireSessionOwnership, as
       // Tüm odaya yeni oylanabilir görüşü bildir
       io.to(`session-${upperCode}`).emit('new-statement', statement);
       // Analizi tetikle
-      runAndBroadcastAnalysis(upperCode);
+      runAndBroadcastAnalysis(upperCode, 'approveStatement');
     }
 
     // Canlı oylama güncellemesi için yayın
@@ -619,6 +624,12 @@ app.get('/api/sessions/:code/report', checkParticipantAccess, async (req, res) =
     };
     const executiveSummary = await generateExecutiveSummary(execSummaryData);
 
+    // Rapor için simülasyon kayıtlarını kutuplaşma geçmişinden tamamen filtrele
+    const cleanAnalysis = session.analysis ? {
+      ...session.analysis,
+      polarizationHistory: (session.analysis.polarizationHistory || []).filter(pt => !pt.isSimulated)
+    } : session.analysis;
+
     res.json({
       code: session.code,
       title: session.title,
@@ -628,9 +639,10 @@ app.get('/api/sessions/:code/report', checkParticipantAccess, async (req, res) =
       participantsCount: activeParticipants.length,
       statementsCount: session.statements.length,
       statements: session.statements,
-      analysis: session.analysis,
+      analysis: cleanAnalysis,
       polarizationImpacts,
       executiveSummary,
+      minorityInsights: session.analysis?.minorityInsights || [],
       participants: activeParticipants.map(p => ({
         nickname: p.nickname,
         justification: p.justification,
@@ -643,12 +655,111 @@ app.get('/api/sessions/:code/report', checkParticipantAccess, async (req, res) =
   }
 });
 
+// Kutuplaşma Zaman Serisi Endpoint'i
+app.get('/api/sessions/:code/polarization-history', checkParticipantAccess, async (req, res) => {
+  const { code } = req.params;
+  const upperCode = code.toUpperCase();
+  try {
+    const session = await db.getSessionByCode(upperCode);
+    if (!session) {
+      return res.status(404).json({ success: false, message: 'Oturum bulunamadı.' });
+    }
+    const history = session.polarizationHistory || [];
+    res.json({
+      success: true,
+      code: upperCode,
+      history,
+      currentPolarisability: session.analysis?.polarisability ?? null
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// Katılımcı Kamp Ataması Açıklama Endpoint'i (Şeffaflık Paneli - Sadece JWT Sahiplik Korumalı)
+app.get('/api/sessions/:code/participants/:participantId/camp-explanation', checkParticipantAccess, async (req, res) => {
+  const { code, participantId } = req.params;
+  const upperCode = code.toUpperCase();
+  console.log(`📥 [CAMP EXPLANATION REQUEST RECEIVED] Oturum: ${upperCode}, Katılımcı: ${participantId} — ${new Date().toISOString()}`);
+
+  try {
+    const session = req.resolvedSession || await db.getSessionByCode(upperCode);
+    if (!session) {
+      console.warn(`⚠️ [CAMP EXPLANATION] Oturum bulunamadı: ${upperCode}`);
+      return res.status(404).json({ success: false, message: 'Oturum bulunamadı.' });
+    }
+
+    let isAuthorized = false;
+    let authReason = 'No Authorization Header';
+
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+      try {
+        const token = req.headers.authorization.split(' ')[1];
+        const decoded = jwt.verify(token, JWT_SECRET);
+        if (decoded) {
+          if (decoded.type === 'admin') {
+            isAuthorized = true;
+            authReason = 'Admin Token';
+          } else if (decoded.type === 'moderator' && decoded.sessionCode?.toUpperCase() === upperCode) {
+            isAuthorized = true;
+            authReason = 'Moderator Token';
+          } else if (decoded.type === 'participant_access' && decoded.sessionCode?.toUpperCase() === upperCode) {
+            if (decoded.participantId && decoded.participantId === participantId) {
+              isAuthorized = true;
+              authReason = 'Matching Participant Token';
+            } else {
+              authReason = `ParticipantId Mismatch (Token: ${decoded.participantId}, URL: ${participantId})`;
+            }
+          } else {
+            authReason = `Invalid Token Type/SessionCode (Type: ${decoded.type}, Code: ${decoded.sessionCode})`;
+          }
+        }
+      } catch (e) {
+        authReason = `JWT Verification Exception: ${e.message}`;
+      }
+    }
+
+    console.log(`🔒 [CAMP EXPLANATION AUTH] Authorized: ${isAuthorized} | Reason: ${authReason}`);
+
+    if (!isAuthorized) {
+      return res.status(403).json({ success: false, message: 'Bu bilgiye erişim yetkiniz yok.' });
+    }
+
+    const participant = session.participants?.find(p => p.id === participantId);
+    if (!participant || participant.isBanned) {
+      console.warn(`⚠️ [CAMP EXPLANATION] Katılımcı bulunamadı veya yasaklı: ${participantId}`);
+      return res.status(403).json({ success: false, message: 'Bu bilgiye erişim yetkiniz yok.' });
+    }
+
+    const tStart = Date.now();
+    console.log(`🧠 [CAMP EXPLANATION CALC] Calculating explanation for participant ${participantId.substring(0, 8)}…`);
+
+    const explanation = getCampAssignmentExplanation(participantId, session);
+    if (!explanation) {
+      console.warn(`⚠️ [CAMP EXPLANATION] Explanation returned null for participant ${participantId.substring(0, 8)}`);
+      return res.status(400).json({ success: false, message: 'Kamp ataması açıklaması için henüz yeterli analiz verisi yok.' });
+    }
+
+    const elapsed = Date.now() - tStart;
+    console.log(`✅ [CAMP EXPLANATION SUCCESS] Oturum ${upperCode}, Katılımcı ${participantId.substring(0, 8)}… — Süre: ${elapsed}ms (${explanation.definingVotes?.length ?? 0} belirleyici oy)`);
+
+    return res.json({
+      success: true,
+      explanation
+    });
+  } catch (err) {
+    console.error(`❌ [CAMP EXPLANATION EXCEPTION] ${err.stack || err.message}`);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 const inFlightConsensusLocks = new Map();
 
 // 8.0b. Uzlaşı Potansiyeli Keşfi (REST API)
 app.post('/api/sessions/:code/discover-consensus', requireSessionOwnership, async (req, res) => {
   const { code } = req.params;
   const upperCode = code.toUpperCase();
+  const ENDPOINT_TIMEOUT_MS = 15000;
 
   try {
     const session = await db.getSessionByCode(upperCode);
@@ -666,29 +777,63 @@ app.post('/api/sessions/:code/discover-consensus', requireSessionOwnership, asyn
     // In-Flight Lock & Deduplication per session code (Requirement 3)
     if (inFlightConsensusLocks.has(upperCode)) {
       console.log(`🔒 [LLM IN-FLIGHT DEDUP] Concurrent request for session ${upperCode} detected. Joining active in-flight promise...`);
-      const consensusPotential = await inFlightConsensusLocks.get(upperCode);
-      const lastAnalyzedAt = analysis.lastAnalyzedAt || Date.now();
-      return res.json({
-        success: true,
-        consensusPotential,
-        dataFreshness: {
-          isFresh: lastAnalyzedAt >= mutationInfo.lastMutatedAt,
-          version: mutationInfo.version,
-          lastAnalyzedAt,
-          lastMutatedAt: mutationInfo.lastMutatedAt
-        }
-      });
+      try {
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('ENDPOINT_TIMEOUT')), ENDPOINT_TIMEOUT_MS)
+        );
+        const consensusPotential = await Promise.race([
+          inFlightConsensusLocks.get(upperCode),
+          timeoutPromise
+        ]);
+        const lastAnalyzedAt = analysis.lastAnalyzedAt || Date.now();
+        const quotaStatus = getLlmQuotaStatus();
+        return res.json({
+          success: true,
+          consensusPotential,
+          isQuotaExhausted: quotaStatus.isRpdExhausted,
+          dataFreshness: {
+            isFresh: lastAnalyzedAt >= mutationInfo.lastMutatedAt,
+            version: mutationInfo.version,
+            lastAnalyzedAt,
+            lastMutatedAt: mutationInfo.lastMutatedAt
+          }
+        });
+      } catch (lockErr) {
+        console.warn(`⚠️ [LOCK TIMEOUT/ERROR] In-flight promise for ${upperCode} failed or timed out: ${lockErr.message}. Falling back to rule-based consensus.`);
+        const fallback = generateRuleBasedConsensusFallback(analysis.camps, session.question);
+        const quotaStatus = getLlmQuotaStatus();
+        return res.json({
+          success: true,
+          consensusPotential: fallback,
+          isFallback: true,
+          isQuotaExhausted: quotaStatus.isRpdExhausted,
+          dataFreshness: { isFresh: false, version: mutationInfo.version, lastAnalyzedAt: Date.now(), lastMutatedAt: mutationInfo.lastMutatedAt }
+        });
+      }
     }
 
     const consensusPromise = (async () => {
       try {
-        const result = await discoverConsensusPotential(analysis.camps, session.question, upperCode, mutationInfo.version);
-        // Persist LLM result & analysis version across server restarts (Req 5)
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('ENDPOINT_TIMEOUT')), ENDPOINT_TIMEOUT_MS)
+        );
+        const result = await Promise.race([
+          discoverConsensusPotential(analysis.camps, session.question, upperCode, mutationInfo.version),
+          timeoutPromise
+        ]);
         analysis.consensusPotential = result;
         analysis.lastAnalysisVersion = mutationInfo.version;
         analysis.lastAnalyzedAt = Date.now();
         db.updateAnalysis(upperCode, analysis);
         return result;
+      } catch (callErr) {
+        console.warn(`⚠️ [CONSENSUS TIMEOUT/ERROR] discoverConsensusPotential call for ${upperCode} failed: ${callErr.message}. Falling back to rule-based consensus.`);
+        const fallback = generateRuleBasedConsensusFallback(analysis.camps, session.question);
+        analysis.consensusPotential = fallback;
+        analysis.lastAnalysisVersion = mutationInfo.version;
+        analysis.lastAnalyzedAt = Date.now();
+        db.updateAnalysis(upperCode, analysis);
+        return fallback;
       } finally {
         inFlightConsensusLocks.delete(upperCode);
       }
@@ -699,10 +844,12 @@ app.post('/api/sessions/:code/discover-consensus', requireSessionOwnership, asyn
 
     const lastAnalyzedAt = analysis.lastAnalyzedAt || Date.now();
     const isFresh = lastAnalyzedAt >= mutationInfo.lastMutatedAt;
+    const quotaStatus = getLlmQuotaStatus();
 
     res.json({
       success: true,
       consensusPotential,
+      isQuotaExhausted: quotaStatus.isRpdExhausted,
       dataFreshness: {
         isFresh,
         version: mutationInfo.version,
@@ -711,8 +858,27 @@ app.post('/api/sessions/:code/discover-consensus', requireSessionOwnership, asyn
       }
     });
   } catch (err) {
-    res.status(500).json({ success: false, message: 'Şu an uzlaşı potansiyeli analiz edilemedi.' });
+    console.error(`❌ [DISCOVER CONSENSUS ENDPOINT ERROR] ${err.message}`);
+    const session = db.getSessionSync(upperCode);
+    const fallback = generateRuleBasedConsensusFallback(session?.analysis?.camps, session?.question);
+    const quotaStatus = getLlmQuotaStatus();
+    res.json({
+      success: true,
+      consensusPotential: fallback,
+      isFallback: true,
+      isQuotaExhausted: quotaStatus.isRpdExhausted,
+      message: err.message
+    });
   }
+});
+
+// 8.0c. LLM Kota ve Sağlık Durumu Endpoint'i (Admin Panel Banner için)
+app.get('/api/admin/llm-status', authenticateAdmin, (req, res) => {
+  const status = getLlmQuotaStatus();
+  res.json({
+    success: true,
+    status
+  });
 });
 
 // 8.1. CSV İhracatı (Oylama Matrisi)
@@ -772,11 +938,12 @@ app.get('*', (req, res) => {
 const activeDebouncers = new Map();
 const ANALYSIS_COOLDOWN = 1500; // Milisaniye
 
-function runAndBroadcastAnalysis(sessionCode) {
+function runAndBroadcastAnalysis(sessionCode, triggerReason = 'mutation') {
   if (!activeDebouncers.has(sessionCode)) {
-    activeDebouncers.set(sessionCode, { pending: false, lastRun: 0 });
+    activeDebouncers.set(sessionCode, { pending: false, lastRun: 0, lastReason: triggerReason });
   }
   const state = activeDebouncers.get(sessionCode);
+  state.lastReason = triggerReason;
   const now = Date.now();
   const timeSinceLast = now - state.lastRun;
 
@@ -785,16 +952,16 @@ function runAndBroadcastAnalysis(sessionCode) {
       state.pending = true;
       setTimeout(() => {
         state.pending = false;
-        performAnalysis(sessionCode);
+        performAnalysis(sessionCode, state.lastReason);
       }, ANALYSIS_COOLDOWN - timeSinceLast);
     }
     return;
   }
 
-  performAnalysis(sessionCode);
+  performAnalysis(sessionCode, triggerReason);
 }
 
-export async function performAnalysis(sessionCode) {
+export async function performAnalysis(sessionCode, triggerReason = 'mutation', options = {}) {
   const session = db.getSessionSync(sessionCode);
   if (!session) return;
 
@@ -822,6 +989,40 @@ export async function performAnalysis(sessionCode) {
     db.updateAnalysis(sessionCode, insufficientPayload);
     io.to(`session-${sessionCode}`).emit('analysis-update', insufficientPayload);
     return;
+  }
+
+  // ─── EŞİK KONTROLÜ (MUTATION THRESHOLD CHECK FOR LLM CALLS) ─────────────
+  const pendingVotes = session.pendingVotes || 0;
+  const pendingOpinions = session.pendingOpinions || 0;
+  const pendingTotal = session.pendingMutationCount || 0;
+
+  // Soru güncelleme, kamp ayarları, kick, simülasyon ve manuel tetiklemeler eşik sistemini BYPASS eder.
+  const STRUCTURAL_TRIGGERS = new Set([
+    'updateSessionQuestion',
+    'updateSessionCampsCount',
+    'renameSessionCamp',
+    'kickParticipant',
+    'runSimulation',
+    'force',
+    'manual',
+    'discoverConsensus',
+    'joinSession',
+    'initial'
+  ]);
+
+  const isStructuralOrForce = STRUCTURAL_TRIGGERS.has(triggerReason) || options?.forceLLM === true;
+  const isFirstRun = !session.analysis || !session.analysis.camps || session.analysis.camps.length === 0;
+
+  const thresholdReached = isStructuralOrForce || isFirstRun ||
+    pendingVotes >= MUTATION_THRESHOLD_VOTES ||
+    pendingOpinions >= MUTATION_THRESHOLD_OPINIONS ||
+    pendingTotal >= MUTATION_THRESHOLD_VOTES;
+
+  if (thresholdReached) {
+    console.log(`🎯 [THRESHOLD REACHED] Oturum ${sessionCode} — ${pendingTotal} mutasyon birikti, LLM analizi tetiklendi, sayaç sıfırlandı.`);
+    db.resetPendingMutations(sessionCode);
+  } else {
+    console.log(`📊 [THRESHOLD] Oturum ${sessionCode} — bekleyen mutasyon: ${pendingTotal}/${MUTATION_THRESHOLD_VOTES} — LLM tetiklenmedi, matematik güncellendi.`);
   }
 
   // 1. Oy matrisini oluştur
@@ -855,20 +1056,27 @@ export async function performAnalysis(sessionCode) {
   let axisLabelY = '';
 
   const prevAxisLabels = session.analysis?.axisLabels || {};
-  if (process.env.DISABLE_LLM_CACHE !== 'true' && prevAxisLabels.signatureX === signatureX && prevAxisLabels.x) {
-    const validX = sanitizeLLMResponse(prevAxisLabels.x, 'axis-label');
-    if (validX) axisLabelX = validX;
-  }
-  if (!axisLabelX) {
-    axisLabelX = await generateAxisLabel('x', top3X);
-  }
 
-  if (process.env.DISABLE_LLM_CACHE !== 'true' && prevAxisLabels.signatureY === signatureY && prevAxisLabels.y) {
-    const validY = sanitizeLLMResponse(prevAxisLabels.y, 'axis-label');
-    if (validY) axisLabelY = validY;
-  }
-  if (!axisLabelY) {
-    axisLabelY = await generateAxisLabel('y', top3Y);
+  if (thresholdReached) {
+    if (process.env.DISABLE_LLM_CACHE !== 'true' && prevAxisLabels.signatureX === signatureX && prevAxisLabels.x) {
+      const validX = sanitizeLLMResponse(prevAxisLabels.x, 'axis-label');
+      if (validX) axisLabelX = validX;
+    }
+    if (!axisLabelX) {
+      axisLabelX = await generateAxisLabel('x', top3X);
+    }
+
+    if (process.env.DISABLE_LLM_CACHE !== 'true' && prevAxisLabels.signatureY === signatureY && prevAxisLabels.y) {
+      const validY = sanitizeLLMResponse(prevAxisLabels.y, 'axis-label');
+      if (validY) axisLabelY = validY;
+    }
+    if (!axisLabelY) {
+      axisLabelY = await generateAxisLabel('y', top3Y);
+    }
+  } else {
+    // Eşik dolmadı: LLM çağrılmıyor, önceden saklanan etiket veya kural tabanlı fallback kullanılır
+    axisLabelX = prevAxisLabels.x || generateAxisFallbackSummary('x', top3X);
+    axisLabelY = prevAxisLabels.y || generateAxisFallbackSummary('y', top3Y);
   }
 
   // Koordinatları görselleştirme için normalize et (-80 ile 80 arasına çek)
@@ -914,20 +1122,78 @@ export async function performAnalysis(sessionCode) {
     previousCentroids = session.analysis.camps.map(c => [c.x, c.y]);
   }
 
-  // Yeni centroid'leri ve etiket atamalarını eski centroid'ler ile eşleştir
-  const aligned = alignCentroids(centroids, assignments, previousCentroids);
-  const alignedAssignments = aligned.assignments;
-  const alignedCentroids = aligned.centroids;
+  // Centroid Hizalama (Cluster ID Kararlılığı)
+  const { assignments: alignedAssignments, centroids: alignedCentroids } = alignCentroids(centroids, assignments, previousCentroids);
+
+  // Katılımcıların kamp atamaları değiştiyse hem eski hem yeni kampı dirty (kirli) işaretle
+  const oldPointMap = new Map();
+  if (session.analysis && session.analysis.points) {
+    session.analysis.points.forEach(pt => oldPointMap.set(pt.id, pt.campId));
+  } else {
+    // İlk analiz çalıştığında tüm kampları kirli say
+    db.markAllCampsDirty(sessionCode);
+  }
 
   points.forEach((pt, idx) => {
-    pt.campId = alignedAssignments[idx];
+    const newCampId = alignedAssignments[idx];
+    const oldCampId = oldPointMap.get(pt.id);
+    pt.campId = newCampId;
+
+    if (oldCampId !== undefined && oldCampId !== newCampId) {
+      db.markCampDirty(sessionCode, oldCampId);
+      db.markCampDirty(sessionCode, newCampId);
+    }
   });
 
   // 4. Köprü Cümleleri ve Kamp Ayırt Edici Özellikleri Analizi
-  const { bridges, campCharacteristics } = analyzeCampsAndBridges(statements, activeParticipants, alignedAssignments, k);
+  const { bridges, campCharacteristics, campApprovalRatesTable } = analyzeCampsAndBridges(statements, activeParticipants, alignedAssignments, k);
 
-  // 5. Kampları Detaylandır (LLM Entegrasyonu ile)
-  const camps = await Promise.all(Array(k).fill(0).map(async (_, cIdx) => {
+  // 5. Kampları Detaylandır (Kısmi / Artımlı Seçici Batch LLM Çağrısı ile)
+  const dirtyCampSet = db.getDirtyCamps(sessionCode);
+
+  let batchedSummaries = {};
+  if (thresholdReached) {
+    const draftCamps = Array(k).fill(0).map((_, cIdx) => {
+      let name = `Grup ${String.fromCharCode(65 + cIdx)}`;
+      if (session.customCampNames && session.customCampNames[cIdx] !== undefined) {
+        name = session.customCampNames[cIdx];
+      } else {
+        const characteristics = campCharacteristics[cIdx] || [];
+        if (characteristics.length > 0) {
+          const bestText = characteristics[0].statement.text;
+          const cleanWordList = bestText.split(" ").slice(0, 3).join(" ");
+          name = `"${cleanWordList}..." Taraftarları`;
+        }
+      }
+      const topStatements = (campCharacteristics[cIdx] || []).map(c => ({
+        id: c.statement.id,
+        text: c.statement.text,
+        approvalRate: Math.round(c.approvalRate * 100),
+        contrastScore: parseFloat(c.contrastScore.toFixed(2))
+      }));
+      const prevCamp = session.analysis?.camps?.find(c => c.id === cIdx);
+      return {
+        id: cIdx,
+        name,
+        topStatements,
+        summary: prevCamp?.summary
+      };
+    });
+
+    // YARIŞ DURUMU ÖNLEMİ: LLM çağrısı başlamadan önce dirty kamp ID'lerinin
+    // ve anlık zaman damgasının SNAPSHOT'ını al.
+    // LLM await sırasında gelen yeni mutasyonlar dirtyCamps'e eklenecek —
+    // bunları temizlemekten kaçınmak için clearDirtyCamps'e snapshotTime gönderiyoruz.
+    const snapshotTime = Date.now();
+    const processingIds = new Set(dirtyCampSet);
+
+    batchedSummaries = await generateAllClusterSummaries(draftCamps, session.question, sessionCode, session.version || 1, processingIds);
+    
+    // Sadece snapshot'taki ID'leri temizle — çağrı sırasında gelen yeni mutasyonlar korunur
+    db.clearDirtyCamps(sessionCode, Array.from(processingIds), snapshotTime);
+  }
+
+  const camps = Array(k).fill(0).map((_, cIdx) => {
     const size = points.filter(pt => pt.campId === cIdx).length;
     const centroid = alignedCentroids[cIdx] || [0, 0];
     
@@ -951,15 +1217,14 @@ export async function performAnalysis(sessionCode) {
     }));
 
     const signature = (campCharacteristics[cIdx] || []).map(c => c.statement.id).filter(Boolean).sort().join('-');
+    const prevCamp = session.analysis?.camps?.find(c => c.id === cIdx);
 
     let summary = '';
-    const prevCamp = session.analysis?.camps?.find(c => c.id === cIdx);
-    if (process.env.DISABLE_LLM_CACHE !== 'true' && prevCamp && prevCamp.signature === signature && prevCamp.summary) {
-      const validSummary = sanitizeLLMResponse(prevCamp.summary, 'cluster-summary');
-      if (validSummary) summary = validSummary;
-    }
-    if (!summary) {
-      summary = await generateClusterSummary(cIdx, topStatements);
+    if (thresholdReached) {
+      summary = batchedSummaries[cIdx] || prevCamp?.summary || generateFallbackSummary(cIdx, topStatements);
+    } else {
+      // Eşik dolmadı: LLM çağrılmıyor, önceden saklanan özet veya kural tabanlı fallback kullanılır
+      summary = prevCamp?.summary || generateFallbackSummary(cIdx, topStatements);
     }
 
     return {
@@ -972,7 +1237,7 @@ export async function performAnalysis(sessionCode) {
       summary,
       signature
     };
-  }));
+  });
 
   // 5a. Aykırı Değer (Ambiguous) Tespiti
   points.forEach(pt => {
@@ -1072,6 +1337,65 @@ export async function performAnalysis(sessionCode) {
     ? parseFloat(((totalVotesCount / (totalNonBotParticipants * totalApprovedOpinions)) * 100).toFixed(1))
     : 0;
 
+  // 5e. Azınlık Görüşü Tespiti (Minority Opinion Shield)
+  // Az oy almış veya azınlık destekli ama güçlü gerekçeye sahip görüşleri tespit et.
+  const MINORITY_MIN_VOTES = process.env.MINORITY_MIN_VOTES ? parseInt(process.env.MINORITY_MIN_VOTES, 10) : 3;
+  const MINORITY_MIN_SCORE = process.env.MINORITY_MIN_SCORE ? parseInt(process.env.MINORITY_MIN_SCORE, 10) : 25;
+
+  const statementMetrics = statements.map(st => {
+    const voteCount = activeParticipants.filter(p => p.votes[st.id] !== undefined && p.votes[st.id] !== 0).length;
+    const agreeCount = activeParticipants.filter(p => p.votes[st.id] === 1).length;
+    const approvalRate = voteCount > 0 ? agreeCount / voteCount : 0;
+    const qualityScore = calculateReasoningQualityScore(st.text);
+    return { id: st.id, text: st.text, voteCount, agreeCount, approvalRate, qualityScore };
+  });
+
+  // (a) KESİN ŞART: Sadece en az MINORITY_MIN_VOTES (örn. 3) kadar oylanmış görüşler değerlendirilir
+  const votedStatements = statementMetrics.filter(s => s.voteCount >= MINORITY_MIN_VOTES);
+
+  let minorityInsights = [];
+
+  if (votedStatements.length > 0) {
+    // (b) Onay oranı <= %45 VEYA oy sayısı alt 35%'lik dilimde olan görüşler
+    const sortedVoteCounts = [...votedStatements].map(s => s.voteCount).sort((a, b) => a - b);
+    const p35Index = Math.max(0, Math.floor(sortedVoteCounts.length * 0.35) - 1);
+    const p35Threshold = sortedVoteCounts.length > 0 ? sortedVoteCounts[p35Index] : 0;
+
+    let candidatePool = votedStatements.filter(s =>
+      s.approvalRate <= 0.45 || s.voteCount <= p35Threshold
+    );
+
+    // (c) Gerekçe kalitesi skoru >= MINORITY_MIN_SCORE olanları al
+    let qualified = candidatePool.filter(s => s.qualityScore >= MINORITY_MIN_SCORE);
+
+    // (d) Eğer (c) boş dönerse ama (b) havuzu doluysa, candidatePool içinden en yüksek gerekçe skorlu ilk 3 görüşü al
+    if (qualified.length === 0 && candidatePool.length > 0) {
+      qualified = [...candidatePool]
+        .sort((a, b) => b.qualityScore - a.qualityScore)
+        .slice(0, 3);
+    }
+
+    // (e) Eğer candidatePool da boşsa, minimum oy şartını sağlayan tüm votedStatements içinden approvalRate <= 0.60 olanları al
+    if (qualified.length === 0) {
+      qualified = [...votedStatements]
+        .filter(s => s.approvalRate <= 0.60)
+        .sort((a, b) => b.qualityScore - a.qualityScore)
+        .slice(0, 3);
+    }
+
+    minorityInsights = qualified
+      .sort((a, b) => b.qualityScore - a.qualityScore)
+      .slice(0, 5)
+      .map(s => ({
+        id: s.id,
+        text: s.text,
+        voteCount: s.voteCount,
+        agreeCount: s.agreeCount,
+        approvalRate: Math.round(s.approvalRate * 100),
+        qualityScore: s.qualityScore
+      }));
+  }
+
   // Kutuplaşma Derecesini (Polarisability) yeni formülle hesapla
   const polResult = calculatePolarisability(points, camps);
   const polarisability = polResult.polarisability;
@@ -1096,12 +1420,17 @@ export async function performAnalysis(sessionCode) {
     targetK: session.targetK || 3,
     polarizationHistory: session.polarizationHistory || [],
     varianceExplained,
-    clusterStability
+    clusterStability,
+    minorityInsights,
+    // ⏱ Ön-hesaplanmış kamp onay oranları — getCampAssignmentExplanation'ın sesteş döngü kullanmadan
+    // hızlı lookup yapabilmesi için. Yapı: { [campId]: { [statementId]: rate } }
+    campApprovalRates: campApprovalRatesTable
   };
 
   db.updateAnalysis(sessionCode, analysis);
   if (polarisability !== null) {
-    db.addPolarizationHistoryEntry(sessionCode, polarisability);
+    const isSimulated = triggerReason === 'runSimulation';
+    db.addPolarizationHistoryEntry(sessionCode, polarisability, activeParticipants.length, triggerReason, isSimulated);
   }
   
   // Güncel geçmişi analize tekrar yerleştir
@@ -1262,7 +1591,13 @@ io.on('connection', (socket) => {
       }
 
       const participant = db.addParticipant(code, nickname, justification);
-      callback({ success: true, participantId: participant.id, nickname: participant.nickname });
+      const token = jwt.sign({
+        type: 'participant_access',
+        sessionCode: code,
+        participantId: participant.id
+      }, JWT_SECRET, { expiresIn: '24h' });
+
+      callback({ success: true, participantId: participant.id, nickname: participant.nickname, token });
       // Moderatörlere bildir
       io.to(`moderator-${code}`).emit('participant-joined', {
         id: participant.id,
@@ -1273,7 +1608,7 @@ io.on('connection', (socket) => {
 
       io.to(`session-${code}`).emit('stats-update', { participantsCount: session.participants.filter(p => !p.isBanned).length });
 
-      runAndBroadcastAnalysis(code);
+      runAndBroadcastAnalysis(code, 'joinSession');
     } catch (err) {
       callback({ success: false, message: err.message || 'Kayıt sırasında hata oluştu' });
     }
@@ -1328,7 +1663,7 @@ io.on('connection', (socket) => {
     
     if (success) {
       if (callback) callback({ success: true });
-      runAndBroadcastAnalysis(code);
+      runAndBroadcastAnalysis(code, 'castVote');
     } else {
       if (callback) callback({ success: false, message: 'Oy kaydedilemedi veya kullanıcı engelli' });
     }
@@ -1346,7 +1681,7 @@ io.on('connection', (socket) => {
       const session = db.getSessionSync(code);
       io.to(`moderator-${code}`).emit('moderation-queue', session.moderationQueue);
       io.to(`session-${code}`).emit('new-statement', statement);
-      runAndBroadcastAnalysis(code);
+      runAndBroadcastAnalysis(code, 'approveStatement');
       sendAiAccuracyToRoom(code);
     }
   });
@@ -1370,6 +1705,7 @@ io.on('connection', (socket) => {
     if (!checkSocketAuth(code)) return;
     db.updateSessionQuestion(code, newQuestion);
     io.to(`session-${code}`).emit('question-updated', newQuestion);
+    runAndBroadcastAnalysis(code, 'updateSessionQuestion');
   });
 
   // Simülasyon Çalıştırma (Katılımcı Yük Testi)
@@ -1383,7 +1719,7 @@ io.on('connection', (socket) => {
       callback({ success: true, message: `${count} adet simüle katılımcı başarıyla oy verdi.` });
       
       io.to(`session-${code}`).emit('stats-update', { participantsCount: session.participants.filter(p => !p.isBanned).length });
-      performAnalysis(code); // Debounce beklemeden doğrudan çalıştır
+      performAnalysis(code, 'runSimulation'); // Debounce beklemeden doğrudan çalıştır
     } catch (err) {
       callback({ success: false, message: `Simülasyon hatası: ${err.message}` });
     }
@@ -1441,7 +1777,7 @@ io.on('connection', (socket) => {
       io.to(`session-${code}`).emit('stats-update', { participantsCount: session.participants.filter(p => !p.isBanned).length });
       
       // Analiz motorunu tetikle (oylar çıkarıldığı için koordinatlar güncellenecektir)
-      runAndBroadcastAnalysis(code);
+      runAndBroadcastAnalysis(code, 'kickParticipant');
     }
   });
 
@@ -1451,7 +1787,7 @@ io.on('connection', (socket) => {
     if (!checkSocketAuth(code, true)) return;
     const success = db.updateSessionCampsCount(code, targetK);
     if (success) {
-      runAndBroadcastAnalysis(code);
+      runAndBroadcastAnalysis(code, 'updateSessionCampsCount');
     }
   });
 
@@ -1461,7 +1797,7 @@ io.on('connection', (socket) => {
     if (!checkSocketAuth(code, true)) return;
     const success = db.renameSessionCamp(code, campId, newName);
     if (success) {
-      runAndBroadcastAnalysis(code);
+      runAndBroadcastAnalysis(code, 'renameSessionCamp');
     }
   });
 
@@ -1488,6 +1824,50 @@ io.on('connection', (socket) => {
     // Gönüllü çıkışlar leave-session event'i üzerinden yönetilir.
   });
 });
+
+// ─── GÜVENLİ KAPANMA MEKANİZMASI (GRACEFUL SHUTDOWN) ───
+// Beklenmeyen yakalanmamış hatalarda (uncaughtException / unhandledRejection)
+// sunucu iç durumunun (kilitler, DB transaksiyonları) bozulmasını önlemek için
+// açık soketler kapatılır, 500ms grace period ile bekleyen yazmalar beklenir ve process.exit(1) çağrılır.
+let isShuttingDown = false;
+
+export function gracefulShutdown(err, origin = 'uncaughtException') {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+
+  console.error(`💥 [CRITICAL UNHANDLED ERROR] Origin: ${origin} — Sunucu güvenli şekilde kapatılıyor...`, err?.stack || err);
+
+  // 1. Güvenlik Zaman Aşımı: 2 saniye içinde kapanış tamamlanmazsa süreci zorla sonlandır
+  const forceExitTimeout = setTimeout(() => {
+    console.error('⚠️ [GRACEFUL SHUTDOWN TIMEOUT] Kapanış zaman aşımına uğradı, zorla sonlandırılıyor (exit code 1).');
+    process.exit(1);
+  }, 2000);
+  if (forceExitTimeout.unref) forceExitTimeout.unref();
+
+  try {
+    // 2. Yeni HTTP ve Socket.io bağlantılarını reddet
+    if (io) {
+      io.disconnectSockets(true);
+      io.close();
+    }
+    if (httpServer && httpServer.listening) {
+      httpServer.close();
+    }
+  } catch (shutdownErr) {
+    console.error('⚠️ [SHUTDOWN ERROR]', shutdownErr);
+  }
+
+  // 3. 500ms grace period sonrası sonlandır
+  setTimeout(() => {
+    console.log('🛑 Sunucu güvenli şekilde kapatıldı (process.exit code 1).');
+    process.exit(1);
+  }, 500);
+}
+
+if (process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
+  process.on('uncaughtException', (err) => gracefulShutdown(err, 'uncaughtException'));
+  process.on('unhandledRejection', (reason) => gracefulShutdown(reason, 'unhandledRejection'));
+}
 
 if (process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
   const PORT = process.env.PORT || 3001;

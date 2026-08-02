@@ -83,7 +83,9 @@ export const passwordRateLimiter = rateLimit({
 
 // 3. Katılımcı oturum erişim kontrolü (Public / Şifreli)
 export async function checkParticipantAccess(req, res, next) {
-  const code = req.params.code || req.body.sessionCode || req.query.sessionCode;
+  const code = req.params.code || req.body?.sessionCode || req.query?.sessionCode;
+  console.log(`🔍 [CHECK PARTICIPANT ACCESS] Path: ${req.originalUrl} | Code: ${code || 'NONE'}`);
+
   if (!code) {
     return res.status(400).json({ success: false, message: 'Oturum kodu belirtilmedi.' });
   }
@@ -100,6 +102,7 @@ export async function checkParticipantAccess(req, res, next) {
 
   // Oturum PUBLIC ise doğrudan geçişe izin ver
   if (session.visibility === 'PUBLIC') {
+    req.resolvedSession = session;
     return next();
   }
 
@@ -133,6 +136,9 @@ export async function checkParticipantAccess(req, res, next) {
   } else if (authResult.type === 'participant_access') {
     req.participantAccess = authResult.decoded;
   }
+
+  // Downstream handlers'ın tekrar DB sorgusu yapmaması için session'ı aktar
+  req.resolvedSession = session;
 
   next();
 }
