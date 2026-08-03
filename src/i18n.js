@@ -8,7 +8,7 @@ export const translations = {
     navReport: "Bulgular & Rapor",
     navJsonReport: "JSON Rapor",
     navPrint: "Yazdır",
-    navAdminPanel: "Yönetici Paneli",
+    navAdminPanel: "Yönetici Ekranı",
     connConnected: "🟢 Bağlı",
     connDisconnected: "🔴 Bağlantı Kesildi",
 
@@ -132,7 +132,7 @@ export const translations = {
     adminAiWarningLabel: "AI Uyarısı:",
     adminKickConfirm: "\"{nick}\" katılımcısını masadan atmak istiyor musunuz?",
     adminModalTitle: "Yönetici Kimlik Doğrulama",
-    adminModalDesc: "Yönetici paneline erişmek için şifrenizi girin.",
+    adminModalDesc: "Yönetici ekranına erişmek için şifrenizi girin.",
     adminModalPassLabel: "Yönetici Şifresi",
     adminModalPassPlaceholder: "Şifreyi giriniz...",
     adminModalCancel: "İptal",

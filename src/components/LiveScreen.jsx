@@ -18,6 +18,18 @@ export default function LiveScreen({ question, analysis, stats, statements = [],
   // Metrics map for fast lookup of live opinion metrics
   const metricsMap = new Map((analysis?.allStatements || analysis?.statementMetrics || []).map(s => [s.id, s]));
 
+  // Onay oranına (azalan) → oy sayısına (azalan) göre canlı sıralama
+  const sortedStatements = [...approvedStatements].sort((a, b) => {
+    const ma = metricsMap.get(a.id) || a;
+    const mb = metricsMap.get(b.id) || b;
+    const rateA = ma.approvalRate !== undefined ? ma.approvalRate : 0;
+    const rateB = mb.approvalRate !== undefined ? mb.approvalRate : 0;
+    if (rateB !== rateA) return rateB - rateA;
+    const votesA = ma.voteCount !== undefined ? ma.voteCount : 0;
+    const votesB = mb.voteCount !== undefined ? mb.voteCount : 0;
+    return votesB - votesA;
+  });
+
   // insufficientData durumunda harita yerine bilgilendirme gösterilir
   const isInsufficient = analysis?.insufficientData === true;
   const points = isInsufficient ? [] : (analysis?.points || []);
@@ -625,8 +637,8 @@ export default function LiveScreen({ question, analysis, stats, statements = [],
 
             {/* Modal Liste Gövdesi */}
             <div style={{ padding: '1.25rem 1.5rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.85rem', flex: 1 }}>
-              {approvedStatements.length > 0 ? (
-                approvedStatements.map((st, idx) => {
+              {sortedStatements.length > 0 ? (
+                sortedStatements.map((st, idx) => {
                   const metric = metricsMap.get(st.id) || st;
                   const voteCount = metric.voteCount !== undefined
                     ? metric.voteCount
