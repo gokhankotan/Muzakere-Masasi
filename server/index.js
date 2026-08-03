@@ -638,7 +638,7 @@ app.get('/api/sessions/:code/report', checkParticipantAccess, async (req, res) =
       createdAt: session.createdAt,
       participantsCount: activeParticipants.length,
       statementsCount: session.statements.length,
-      statements: session.statements,
+      statements: getEnrichedStatements(session),
       analysis: cleanAnalysis,
       polarizationImpacts,
       executiveSummary,
@@ -1341,11 +1341,25 @@ export async function performAnalysis(sessionCode, triggerReason = 'mutation', o
   const MINORITY_MIN_SCORE = process.env.MINORITY_MIN_SCORE ? parseInt(process.env.MINORITY_MIN_SCORE, 10) : 25;
 
   const statementMetrics = statements.map(st => {
-    const voteCount = activeParticipants.filter(p => p.votes[st.id] !== undefined && p.votes[st.id] !== 0).length;
-    const agreeCount = activeParticipants.filter(p => p.votes[st.id] === 1).length;
-    const approvalRate = voteCount > 0 ? agreeCount / voteCount : 0;
+    const voteCount = activeParticipants.filter(p => p.votes && p.votes[st.id] !== undefined && p.votes[st.id] !== 0).length;
+    const agreeCount = activeParticipants.filter(p => p.votes && p.votes[st.id] === 1).length;
+    const disagreeCount = activeParticipants.filter(p => p.votes && p.votes[st.id] === -1).length;
+    const passCount = activeParticipants.filter(p => p.votes && p.votes[st.id] === 0).length;
+    const approvalRate = voteCount > 0 ? Math.round((agreeCount / voteCount) * 100) : 0;
     const qualityScore = calculateReasoningQualityScore(st.text);
-    return { id: st.id, text: st.text, voteCount, agreeCount, approvalRate, qualityScore };
+    return {
+      ...st,
+      id: st.id,
+      text: st.text,
+      approved: st.approved,
+      status: st.status,
+      voteCount,
+      agreeCount,
+      disagreeCount,
+      passCount,
+      approvalRate,
+      qualityScore
+    };
   });
 
   // (a) KESİN ŞART: Sadece en az MINORITY_MIN_VOTES (örn. 3) kadar oylanmış görüşler değerlendirilir
@@ -1360,7 +1374,7 @@ export async function performAnalysis(sessionCode, triggerReason = 'mutation', o
     const p35Threshold = sortedVoteCounts.length > 0 ? sortedVoteCounts[p35Index] : 0;
 
     let candidatePool = votedStatements.filter(s =>
-      s.approvalRate <= 0.45 || s.voteCount <= p35Threshold
+      s.approvalRate <= 45 || s.voteCount <= p35Threshold
     );
 
     // (c) Gerekçe kalitesi skoru >= MINORITY_MIN_SCORE olanları al
@@ -1376,7 +1390,7 @@ export async function performAnalysis(sessionCode, triggerReason = 'mutation', o
     // (e) Eğer candidatePool da boşsa, minimum oy şartını sağlayan tüm votedStatements içinden approvalRate <= 0.60 olanları al
     if (qualified.length === 0) {
       qualified = [...votedStatements]
-        .filter(s => s.approvalRate <= 0.60)
+        .filter(s => s.approvalRate <= 60)
         .sort((a, b) => b.qualityScore - a.qualityScore)
         .slice(0, 3);
     }
@@ -1389,7 +1403,7 @@ export async function performAnalysis(sessionCode, triggerReason = 'mutation', o
         text: s.text,
         voteCount: s.voteCount,
         agreeCount: s.agreeCount,
-        approvalRate: Math.round(s.approvalRate * 100),
+        approvalRate: s.approvalRate,
         qualityScore: s.qualityScore
       }));
   }
@@ -1402,6 +1416,8 @@ export async function performAnalysis(sessionCode, triggerReason = 'mutation', o
   const analysis = {
     points,
     camps,
+    allStatements: statementMetrics,
+    statementMetrics,
     bridges: bridges.map(b => ({
       id: b.statement.id,
       text: b.statement.text,
@@ -1435,6 +1451,26 @@ export async function performAnalysis(sessionCode, triggerReason = 'mutation', o
   analysis.polarizationHistory = session.polarizationHistory || [];
   
   io.to(`session-${sessionCode}`).emit('analysis-update', analysis);
+}
+
+function getEnrichedStatements(session) {
+  if (!session || !session.statements) return [];
+  const activeParticipants = (session.participants || []).filter(p => !p.isBanned);
+  return session.statements.map(st => {
+    const voteCount = activeParticipants.filter(p => p.votes && p.votes[st.id] !== undefined && p.votes[st.id] !== 0).length;
+    const agreeCount = activeParticipants.filter(p => p.votes && p.votes[st.id] === 1).length;
+    const disagreeCount = activeParticipants.filter(p => p.votes && p.votes[st.id] === -1).length;
+    const passCount = activeParticipants.filter(p => p.votes && p.votes[st.id] === 0).length;
+    const approvalRate = voteCount > 0 ? Math.round((agreeCount / voteCount) * 100) : 0;
+    return {
+      ...st,
+      voteCount,
+      agreeCount,
+      disagreeCount,
+      passCount,
+      approvalRate
+    };
+  });
 }
 
 async function sendAiAccuracy(sessionCode, targetSocketOrIo) {
@@ -1492,7 +1528,7 @@ io.on('connection', (socket) => {
   socket.emit('session-state', {
     question: defaultSession.question,
     status: defaultSession.status,
-    statements: defaultSession.statements,
+    statements: getEnrichedStatements(defaultSession),
     analysis: defaultSession.analysis,
     participantsCount: defaultSession.participants.filter(p => !p.isBanned).length
   });
@@ -1525,7 +1561,7 @@ io.on('connection', (socket) => {
     socket.emit('session-state', {
       question: session.question,
       status: session.status,
-      statements: session.statements,
+      statements: getEnrichedStatements(session),
       analysis: session.analysis,
       participantsCount: session.participants.filter(p => !p.isBanned).length,
       visibility: session.visibility,
@@ -1555,7 +1591,7 @@ io.on('connection', (socket) => {
       socket.emit('session-state', {
         question: session.question,
         status: session.status,
-        statements: session.statements,
+        statements: getEnrichedStatements(session),
         analysis: session.analysis,
         participantsCount: session.participants.filter(p => !p.isBanned).length,
         visibility: session.visibility,
