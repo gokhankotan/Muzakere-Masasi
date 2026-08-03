@@ -15,6 +15,9 @@ export default function LiveScreen({ question, analysis, stats, statements = [],
   // Filter approved/active statements for voting
   const approvedStatements = statements.filter(st => st.approved !== false && st.status !== 'PENDING' && st.status !== 'REJECTED');
 
+  // Metrics map for fast lookup of live opinion metrics
+  const metricsMap = new Map((analysis?.allStatements || analysis?.statementMetrics || []).map(s => [s.id, s]));
+
   // insufficientData durumunda harita yerine bilgilendirme gösterilir
   const isInsufficient = analysis?.insufficientData === true;
   const points = isInsufficient ? [] : (analysis?.points || []);
@@ -623,20 +626,17 @@ export default function LiveScreen({ question, analysis, stats, statements = [],
             {/* Modal Liste Gövdesi */}
             <div style={{ padding: '1.25rem 1.5rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.85rem', flex: 1 }}>
               {approvedStatements.length > 0 ? (
-                (() => {
-                  const metricsMap = new Map((analysis?.allStatements || analysis?.statementMetrics || []).map(s => [s.id, s]));
+                approvedStatements.map((st, idx) => {
+                  const metric = metricsMap.get(st.id) || st;
+                  const voteCount = metric.voteCount !== undefined
+                    ? metric.voteCount
+                    : ((metric.agreeCount || 0) + (metric.disagreeCount || 0) + (metric.passCount || 0));
+                  const agreeCount = metric.agreeCount || 0;
+                  const approvalPct = metric.approvalRate !== undefined
+                    ? metric.approvalRate
+                    : (voteCount > 0 ? Math.round((agreeCount / Math.max(1, voteCount)) * 100) : 0);
 
-                  return approvedStatements.map((st, idx) => {
-                    const metric = metricsMap.get(st.id) || st;
-                    const voteCount = metric.voteCount !== undefined
-                      ? metric.voteCount
-                      : ((metric.agreeCount || 0) + (metric.disagreeCount || 0) + (metric.passCount || 0));
-                    const agreeCount = metric.agreeCount || 0;
-                    const approvalPct = metric.approvalRate !== undefined
-                      ? metric.approvalRate
-                      : (voteCount > 0 ? Math.round((agreeCount / Math.max(1, voteCount)) * 100) : 0);
-
-                    return (
+                  return (
                     <div key={st.id || idx} style={{
                       padding: '1.1rem 1.35rem',
                       background: 'var(--bg-main)',
@@ -683,7 +683,7 @@ export default function LiveScreen({ question, analysis, stats, statements = [],
                       </div>
                     </div>
                   );
-                })()
+                })
               ) : (
                 <div style={{ padding: '3rem 1rem', textAlign: 'center', color: 'var(--text-muted)' }}>
                   <Info size={32} style={{ opacity: 0.6, marginBottom: '0.5rem' }} />
