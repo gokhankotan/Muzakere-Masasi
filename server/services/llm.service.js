@@ -593,50 +593,94 @@ Sadece geçerli bir JSON objesi döndür.
   }
 }
 
-export async function generateAxisLabel(axisName, topStatements) {
+export async function generateAxisLabels(topStatementsX, topStatementsY, question = '') {
   if (process.env.LLM_DRY_RUN === 'true') {
     logDryRunCall('axis-label');
-    return `[DRY-RUN] Eksen ${axisName.toUpperCase()} Etiketi`;
+    return {
+      x: `[DRY-RUN] Eksen X Etiketi`,
+      y: `[DRY-RUN] Eksen Y Etiketi`
+    };
   }
 
-  if (!openaiClient || !topStatements || topStatements.length === 0) {
-    return generateAxisFallbackSummary(axisName, topStatements);
+  const fallbackX = generateAxisFallbackSummary('x', topStatementsX);
+  const fallbackY = generateAxisFallbackSummary('y', topStatementsY);
+
+  if (!openaiClient || (!topStatementsX?.length && !topStatementsY?.length)) {
+    return { x: fallbackX, y: fallbackY };
   }
 
-  const statementsText = topStatements
-    .map((st, i) => `${i + 1}. Görüş: "${st.statement.text}" (Yük Ağırlığı: ${st.loading.toFixed(3)})`)
-    .join('\n');
+  const formatStatements = (list) => {
+    if (!list || list.length === 0) return '(Belirleyici görüş yok)';
+    return list
+      .map((st, i) => `${i + 1}. Görüş: "${st.statement?.text || st.text}" (Yük Ağırlığı: ${st.loading?.toFixed?.(3) || '0'})`)
+      .join('\n');
+  };
 
-  const prompt = `Sen PCA eksenlerini temsil ettikleri ana fikre göre Türkçe etiketleyen bir istatistik asistanısın.
+  const textX = formatStatements(topStatementsX);
+  const textY = formatStatements(topStatementsY);
 
-Aşağıda ${axisName.toUpperCase()} eksenini şekillendiren ilk 3 görüş verilmiştir:
+  const prompt = `Sen PCA (Temel Bileşenler Analizi) 2D eksenlerini temsil ettikleri ana fikre ve tutum farklarına göre etiketleyen bir istatistiksel analiz uzmanısın.
 
-${statementsText}
+Müzakere Konusu / Sorusu: "${question}"
 
-Görevin: Bu görüşlerin temsil ettiği ana fikri veya karşıtlığı ifade eden 3-5 KELİMELİK tek bir Türkçe başlık yaz (Örnek: "Toplu Taşıma Odaklılık vs Bireysel Araç").
+X EKSENİNİ (1. Temel Bileşen) Şekillendiren İlk Görüşler:
+${textX}
 
-KESİN KURALLAR:
-- Yalnızca 3-5 kelimelik başlık metnini yaz.
-- Cevabını SADECE şu formatta ver: [CEVAP]buraya nihai cevabını yaz[/CEVAP]`;
+Y EKSENİNİ (2. Temel Bileşen) Şekillendiren İlk Görüşler:
+${textY}
+
+Görevin:
+1. X ve Y eksenleri bir iki boyutlu koordinat sisteminde BİRBİRİNE DİK (ortogonal) ve İSTATİSTİKSEL OLARAK BAĞIMSIZ iki ayrı ayrışma yönüdür.
+2. X ve Y için DİĞERİNDEN AÇIKÇA FARKLI, BİRBİRİYLE ÇELİŞMEYEN VE TAMAMLAYICI 3-6 kelimelik iki ayrı Türkçe eksen etiketi üret.
+3. KESİNLİKLE TEK BOYUTLU DEMOGRAFİK TANIMLAMALAR VEYA SADECE YAŞ/CİNSİYET BİLDİRİMLERİ YAPMA (Örn. "20-30 Yaşında Olmak", "40-50 Yaş Grubu" gibi etiketler YASAKTIR).
+4. Eğer her iki eksen de benzer bir temayı (örn. yaş, ekonomi, ulaşım) konu alıyor gibi görünüyorsa, aralarındaki NÜANS ve TUTUM FARKINI vurgulayan spesifik etiketler yaz. Örneğin yaş farklılıkları varsa "Genç Katılımcıların Teknolojik Yenilikçi Tutumu" ve "Kıdemli Katılımcıların Kurumsal Deneyim Odaklılığı" gibi tutum/görüş farkını öne çıkar.
+
+ÇIKTI FORMATI:
+Cevabını SADECE aşağıdaki JSON formatında ve [CEVAP]...[/CEVAP] etiketleri içinde ver:
+
+[CEVAP]
+{
+  "x": "X Ekseni Başlığı",
+  "y": "Y Ekseni Başlığı"
+}
+[/CEVAP]`;
 
   const requestParams = {
     model: modelName,
     messages: [
-      { role: 'system', content: 'Sen PCA eksenlerini etiketleyen bir istatistik asistanısın. Cevabını SADECE şu formatta ver:\n[CEVAP]buraya nihai cevabını yaz[/CEVAP]' },
+      { role: 'system', content: 'Sen PCA eksenlerini etiketleyen bir istatistik asistanısın. Cevabını SADECE istenen JSON ve [CEVAP]...[/CEVAP] formatında ver.' },
       { role: 'user', content: prompt }
     ],
-    max_tokens: 150,
+    max_tokens: 250,
     temperature: 0.3,
   };
 
   const raw = await executeLlmWithRetry(requestParams, 'axis-label');
   if (raw) {
     const extracted = extractDelimited(raw) || raw;
-    const label = sanitizeLLMResponse(extracted, 'axis-label');
-    if (label) return label.replace(/^"|"$/g, '');
+    try {
+      const jsonMatch = extracted.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        const cleanX = sanitizeLLMResponse(parsed.x, 'axis-label');
+        const cleanY = sanitizeLLMResponse(parsed.y, 'axis-label');
+        return {
+          x: cleanX ? cleanX.replace(/^"|"$/g, '') : fallbackX,
+          y: cleanY ? cleanY.replace(/^"|"$/g, '') : fallbackY
+        };
+      }
+    } catch (e) {
+      console.warn('⚠️ [AXIS LABEL JSON PARSE ERROR]', e.message);
+    }
   }
 
-  return generateAxisFallbackSummary(axisName, topStatements);
+  return { x: fallbackX, y: fallbackY };
+}
+
+// Geriye dönük uyumluluk için generateAxisLabel wrapper'ı
+export async function generateAxisLabel(axisName, topStatements) {
+  const res = await generateAxisLabels(axisName === 'x' ? topStatements : [], axisName === 'y' ? topStatements : []);
+  return axisName === 'x' ? res.x : res.y;
 }
 
 export function generateAxisFallbackSummary(axisName, topStatements) {

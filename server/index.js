@@ -15,7 +15,7 @@ import bcrypt from 'bcrypt';
 import { db } from './database.js';
 import { calculatePCA, runKMeansWithStability, analyzeCampsAndBridges, alignCentroids, calculatePolarisability, calculateKMeans, getCampAssignmentExplanation } from './algorithms.js';
 import { authenticateAdmin, passwordRateLimiter, checkParticipantAccess, checkModerator, verifySessionToken, requireSessionOwnership, isSessionOwner } from './middleware/auth.middleware.js';
-import { generateClusterSummary, generateAllClusterSummaries, evaluateOpinionContent, generateAxisLabel, generatePolarizationImpactDescription, discoverConsensusPotential, generateExecutiveSummary, sanitizeLLMResponse, generateFallbackSummary, generateAxisFallbackSummary, generateRuleBasedConsensusFallback, getLlmQuotaStatus, resetRpdQuotaStatus } from './services/llm.service.js';
+import { generateClusterSummary, generateAllClusterSummaries, evaluateOpinionContent, generateAxisLabel, generateAxisLabels, generatePolarizationImpactDescription, discoverConsensusPotential, generateExecutiveSummary, sanitizeLLMResponse, generateFallbackSummary, generateAxisFallbackSummary, generateRuleBasedConsensusFallback, getLlmQuotaStatus, resetRpdQuotaStatus } from './services/llm.service.js';
 import { calculateReasoningQualityScore } from './services/quality.service.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -1062,16 +1062,14 @@ export async function performAnalysis(sessionCode, triggerReason = 'mutation', o
       const validX = sanitizeLLMResponse(prevAxisLabels.x, 'axis-label');
       if (validX) axisLabelX = validX;
     }
-    if (!axisLabelX) {
-      axisLabelX = await generateAxisLabel('x', top3X);
-    }
-
     if (process.env.DISABLE_LLM_CACHE !== 'true' && prevAxisLabels.signatureY === signatureY && prevAxisLabels.y) {
       const validY = sanitizeLLMResponse(prevAxisLabels.y, 'axis-label');
       if (validY) axisLabelY = validY;
     }
-    if (!axisLabelY) {
-      axisLabelY = await generateAxisLabel('y', top3Y);
+    if (!axisLabelX || !axisLabelY) {
+      const jointLabels = await generateAxisLabels(top3X, top3Y, session.question || '');
+      if (!axisLabelX) axisLabelX = jointLabels.x;
+      if (!axisLabelY) axisLabelY = jointLabels.y;
     }
   } else {
     // Eşik dolmadı: LLM çağrılmıyor, önceden saklanan etiket veya kural tabanlı fallback kullanılır
