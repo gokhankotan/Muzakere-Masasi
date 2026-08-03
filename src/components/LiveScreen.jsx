@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Users, FileText, Split, CheckCircle2, AlertCircle, Shield } from 'lucide-react';
+import { Users, FileText, Split, CheckCircle2, AlertCircle, Shield, ListFilter, Info, BarChart2 } from 'lucide-react';
 import { t } from '../i18n';
 
 const getCampColor = (campId, totalCamps) => {
@@ -8,8 +8,12 @@ const getCampColor = (campId, totalCamps) => {
   return `hsl(${hue}, 75%, 50%)`;
 };
 
-export default function LiveScreen({ question, analysis, stats, status = 'active', lang = 'tr' }) {
+export default function LiveScreen({ question, analysis, stats, statements = [], status = 'active', lang = 'tr' }) {
   const [hoveredPoint, setHoveredPoint] = useState(null);
+  const [showActiveOpinions, setShowActiveOpinions] = useState(false);
+
+  // Filter approved/active statements for voting
+  const approvedStatements = statements.filter(st => st.approved !== false && st.status !== 'PENDING' && st.status !== 'REJECTED');
 
   // insufficientData durumunda harita yerine bilgilendirme gösterilir
   const isInsufficient = analysis?.insufficientData === true;
@@ -43,10 +47,44 @@ export default function LiveScreen({ question, analysis, stats, status = 'active
     <div className="live-layout">
       {/* Sol Sütun: Canlı Görselleştirme Haritası ve Kamp Detayları */}
       <div className="live-left glass-panel">
-        <h2 style={{ fontSize: '1.4rem', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <Split size={20} className="text-secondary" />
-          {t('liveTitle', lang)}
-        </h2>
+        <div style={{ borderBottom: '1px solid var(--border-light)', paddingBottom: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <h2 style={{ fontSize: '1.4rem', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+            <Split size={20} className="text-secondary" />
+            {t('liveTitle', lang)}
+          </h2>
+
+          {/* Aktif Görüşler Listesi Açma/Kapatma Butonu */}
+          <button
+            onClick={() => setShowActiveOpinions(prev => !prev)}
+            style={{
+              background: showActiveOpinions ? 'var(--color-primary)' : 'rgba(37, 99, 235, 0.1)',
+              border: '1px solid var(--color-secondary)',
+              borderRadius: '8px',
+              padding: '0.4rem 0.85rem',
+              fontSize: '0.82rem',
+              fontWeight: 600,
+              color: showActiveOpinions ? '#ffffff' : 'var(--color-secondary)',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <ListFilter size={15} />
+            <span>{lang === 'tr' ? 'Aktif Görüşler' : 'Active Opinions'}</span>
+            <span style={{
+              background: showActiveOpinions ? 'rgba(255,255,255,0.25)' : 'var(--color-secondary)',
+              color: '#ffffff',
+              borderRadius: '999px',
+              padding: '0.1rem 0.5rem',
+              fontSize: '0.75rem',
+              fontWeight: 700
+            }}>
+              {approvedStatements.length}
+            </span>
+          </button>
+        </div>
         
         <div style={{ display: 'flex', justifyContent: 'center', margin: '1rem 0' }}>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', maxWidth: '540px', gap: '0.75rem' }}>
@@ -501,6 +539,145 @@ export default function LiveScreen({ question, analysis, stats, status = 'active
           )}
         </div>
       </div>
+
+      {/* Aktif Görüşler Yüksek Kontrastlı Canlı Liste Modal Overlay */}
+      {showActiveOpinions && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(15, 23, 42, 0.75)',
+          backdropFilter: 'blur(8px)',
+          zIndex: 2000,
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: '1.5rem'
+        }}>
+          <div style={{
+            width: '100%',
+            maxWidth: '820px',
+            maxHeight: '85vh',
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border-light)',
+            borderRadius: '16px',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.45)',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden'
+          }}>
+            {/* Modal Başlık */}
+            <div style={{
+              padding: '1.25rem 1.5rem',
+              borderBottom: '1px solid var(--border-light)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              background: 'var(--bg-card-hover)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                <FileText size={22} style={{ color: 'var(--color-secondary)' }} />
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-main)', margin: 0 }}>
+                  {lang === 'tr' ? '📋 Oylamaya Açık Aktif Görüşler' : '📋 Active Voting Opinions'}
+                </h3>
+                <span style={{
+                  background: 'rgba(37, 99, 235, 0.15)',
+                  color: 'var(--color-secondary)',
+                  padding: '0.15rem 0.65rem',
+                  borderRadius: '999px',
+                  fontSize: '0.8rem',
+                  fontWeight: 700
+                }}>
+                  {approvedStatements.length} {lang === 'tr' ? 'Görüş' : 'Opinions'}
+                </span>
+              </div>
+              <button
+                onClick={() => setShowActiveOpinions(false)}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid var(--border-light)',
+                  borderRadius: '8px',
+                  padding: '0.35rem 0.75rem',
+                  fontSize: '0.9rem',
+                  fontWeight: 700,
+                  color: 'var(--text-main)',
+                  cursor: 'pointer'
+                }}
+              >
+                ✕ {lang === 'tr' ? 'Kapat' : 'Close'}
+              </button>
+            </div>
+
+            {/* Modal Liste Gövdesi */}
+            <div style={{ padding: '1.25rem 1.5rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.85rem', flex: 1 }}>
+              {approvedStatements.length > 0 ? (
+                approvedStatements.map((st, idx) => {
+                  const voteCount = st.voteCount !== undefined ? st.voteCount : ((st.agreeCount || 0) + (st.disagreeCount || 0) + (st.passCount || 0));
+                  const agreeCount = st.agreeCount || 0;
+                  const approvalPct = voteCount > 0 ? Math.round((agreeCount / Math.max(1, voteCount)) * 100) : 0;
+
+                  return (
+                    <div key={st.id || idx} style={{
+                      padding: '1.1rem 1.35rem',
+                      background: 'var(--bg-main)',
+                      border: '1px solid var(--border-light)',
+                      borderLeft: '5px solid var(--color-secondary)',
+                      borderRadius: '10px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.6rem'
+                    }}>
+                      <div style={{ fontSize: '1.08rem', fontWeight: 600, color: 'var(--text-main)', lineHeight: 1.5 }}>
+                        "{st.text}"
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.85rem', flexWrap: 'wrap', alignItems: 'center', fontSize: '0.85rem' }}>
+                        <span style={{
+                          background: 'rgba(37, 99, 235, 0.12)',
+                          border: '1px solid rgba(37, 99, 235, 0.3)',
+                          color: 'var(--color-secondary)',
+                          padding: '0.2rem 0.65rem',
+                          borderRadius: '999px',
+                          fontWeight: 600,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.35rem'
+                        }}>
+                          <Users size={14} />
+                          {voteCount} {lang === 'tr' ? 'Oy Kullanıldı' : 'Votes Cast'}
+                        </span>
+
+                        <span style={{
+                          background: 'rgba(16, 185, 129, 0.12)',
+                          border: '1px solid rgba(16, 185, 129, 0.3)',
+                          color: '#10b981',
+                          padding: '0.2rem 0.65rem',
+                          borderRadius: '999px',
+                          fontWeight: 600,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.35rem'
+                        }}>
+                          <CheckCircle2 size={14} />
+                          %{approvalPct} {lang === 'tr' ? 'Onay' : 'Approval'}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div style={{ padding: '3rem 1rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                  <Info size={32} style={{ opacity: 0.6, marginBottom: '0.5rem' }} />
+                  <p style={{ fontSize: '1rem', fontWeight: 600 }}>
+                    {lang === 'tr' ? 'Henüz oylamaya açılmış aktif görüş bulunmuyor.' : 'No active approved opinions available for voting yet.'}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Send, ThumbsUp, ThumbsDown, EyeOff, MapPin, Sparkles, ShieldCheck, Check, X, Lock, Globe, ChevronDown, ChevronUp, Shield } from 'lucide-react';
+import { Send, ThumbsUp, ThumbsDown, EyeOff, MapPin, Sparkles, ShieldCheck, Check, X, Lock, Globe, ChevronDown, ChevronUp, Shield, Target, TrendingUp, Info, Users, CheckCircle2, XCircle, Award } from 'lucide-react';
 import { t } from '../i18n';
 
 const getCampColor = (campId, totalCamps) => {
@@ -598,12 +598,12 @@ export default function Participant({
                     transition: 'all 0.2s ease'
                   }}
                 >
-                  <span>🎯</span>
+                  <Target size={14} />
                   <span>{lang === 'tr' ? 'Neden bu gruptayım?' : 'Why am I in this group?'}</span>
                 </button>
               </div>
 
-              {/* Şeffaflık Paneli (Tek Renk Turkuaz Tema — Az Duyulan Argümanlar Formatında) */}
+              {/* Şeffaflık Paneli (Tek Renk Turkuaz Tema) */}
               {showExplanation && (
                 <div style={{
                   marginTop: '0.75rem',
@@ -623,7 +623,7 @@ export default function Participant({
                     alignItems: 'center',
                     gap: '0.4rem'
                   }}>
-                    <span>🎯</span>
+                    <Target size={16} />
                     <span>{lang === 'tr' ? 'Sizi Bu Kampa Yaklaştıran Oylarınız' : 'Votes Bringing You to This Group'}</span>
                   </h4>
                   <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.75rem', lineHeight: 1.4 }}>
@@ -657,19 +657,22 @@ export default function Participant({
                             <div style={{ fontSize: '0.82rem', color: 'var(--text-main)', lineHeight: 1.5, marginBottom: '0.4rem' }}>
                               "{vote.text}"
                             </div>
-                            <div style={{ display: 'flex', gap: '0.6rem', fontSize: '0.72rem', color: 'var(--text-muted)', flexWrap: 'wrap' }}>
+                            <div style={{ display: 'flex', gap: '0.6rem', fontSize: '0.72rem', color: 'var(--text-muted)', flexWrap: 'wrap', alignItems: 'center' }}>
                               <span style={{
                                 background: 'rgba(6, 182, 212, 0.15)',
                                 border: '1px solid rgba(6, 182, 212, 0.3)',
                                 borderRadius: '999px',
-                                padding: '0.1rem 0.45rem',
+                                padding: '0.1rem 0.55rem',
                                 color: '#22d3ee',
-                                fontWeight: 600
+                                fontWeight: 600,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.3rem'
                               }}>
                                 {isAgree ? (
-                                  <>🟢 {lang === 'tr' ? 'Katılıyorum' : 'Agreed'}</>
+                                  <><CheckCircle2 size={12} /> {lang === 'tr' ? 'Katılıyorum' : 'Agreed'}</>
                                 ) : (
-                                  <>🔴 {lang === 'tr' ? 'Katılmıyorum' : 'Disagreed'}</>
+                                  <><XCircle size={12} style={{ color: '#f87171' }} /> {lang === 'tr' ? 'Katılmıyorum' : 'Disagreed'}</>
                                 )}
                               </span>
 
@@ -677,11 +680,15 @@ export default function Participant({
                                 background: 'rgba(6, 182, 212, 0.12)',
                                 border: '1px solid rgba(6, 182, 212, 0.25)',
                                 borderRadius: '999px',
-                                padding: '0.1rem 0.45rem',
+                                padding: '0.1rem 0.55rem',
                                 color: '#38bdf8',
-                                fontWeight: 600
+                                fontWeight: 600,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.3rem'
                               }}>
-                                📊 {lang === 'tr' ? `Grup Kabulü: %${vote.campApprovalRate}` : `Group Approval: %${vote.campApprovalRate}`}
+                                <TrendingUp size={12} />
+                                {lang === 'tr' ? `Grup Kabulü: %${vote.campApprovalRate}` : `Group Approval: %${vote.campApprovalRate}`}
                               </span>
 
                               {alignmentPct > 0 && (
@@ -689,11 +696,15 @@ export default function Participant({
                                   background: 'rgba(6, 182, 212, 0.18)',
                                   border: '1px solid rgba(6, 182, 212, 0.35)',
                                   borderRadius: '999px',
-                                  padding: '0.1rem 0.45rem',
+                                  padding: '0.1rem 0.55rem',
                                   color: '#22d3ee',
-                                  fontWeight: 600
+                                  fontWeight: 600,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.3rem'
                                 }}>
-                                  🧠 {lang === 'tr' ? `Uyum Skoru: %${alignmentPct}` : `Alignment: %${alignmentPct}`}
+                                  <Sparkles size={12} />
+                                  {lang === 'tr' ? `Uyum Skoru: %${alignmentPct}` : `Alignment: %${alignmentPct}`}
                                 </span>
                               )}
                             </div>
@@ -702,10 +713,13 @@ export default function Participant({
                       })}
                     </div>
                   ) : (
-                    <div style={{ padding: '0.75rem', border: '1px dashed rgba(6, 182, 212, 0.25)', borderRadius: '7px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.78rem' }}>
-                      💡 {lang === 'tr'
-                        ? 'Henüz grubunuza olan belirleyici oy veriniz hesaplanmadı.'
-                        : 'Not enough defining vote data yet.'}
+                    <div style={{ padding: '0.75rem', border: '1px dashed rgba(6, 182, 212, 0.25)', borderRadius: '7px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.78rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
+                      <Info size={14} style={{ color: '#06b6d4' }} />
+                      <span>
+                        {lang === 'tr'
+                          ? 'Henüz grubunuza olan belirleyici oy veriniz hesaplanmadı.'
+                          : 'Not enough defining vote data yet.'}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -756,28 +770,38 @@ export default function Participant({
                   <div style={{ fontSize: '0.82rem', lineHeight: 1.5, marginBottom: '0.4rem' }}>
                     "{insight.text}"
                   </div>
-                  <div style={{ display: 'flex', gap: '0.6rem', fontSize: '0.72rem', color: 'var(--text-muted)', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: '0.6rem', fontSize: '0.72rem', color: 'var(--text-muted)', flexWrap: 'wrap', alignItems: 'center' }}>
                     <span style={{
                       background: 'rgba(245, 158, 11, 0.15)',
                       border: '1px solid rgba(245, 158, 11, 0.3)',
                       borderRadius: '999px',
                       padding: '0.1rem 0.45rem',
                       color: '#f59e0b',
-                      fontWeight: 600
+                      fontWeight: 600,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.3rem'
                     }}>
-                      🧠 {lang === 'tr' ? 'Gerekçe Kalitesi' : 'Quality'}: %{insight.qualityScore}
+                      <Award size={12} /> {lang === 'tr' ? 'Gerekçe Kalitesi' : 'Quality'}: %{insight.qualityScore}
                     </span>
-                    <span>🗳️ {insight.voteCount} {lang === 'tr' ? 'Oy' : 'Votes'}</span>
-                    <span>👍 %{insight.approvalRate ?? Math.round((insight.agreeCount / Math.max(1, insight.voteCount))*100)} {lang === 'tr' ? 'Onay' : 'Approval'}</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                      <Users size={12} /> {insight.voteCount} {lang === 'tr' ? 'Oy' : 'Votes'}
+                    </span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                      <CheckCircle2 size={12} /> %{insight.approvalRate ?? Math.round((insight.agreeCount / Math.max(1, insight.voteCount))*100)} {lang === 'tr' ? 'Onay' : 'Approval'}
+                    </span>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div style={{ padding: '0.75rem', border: '1px dashed rgba(245, 158, 11, 0.25)', borderRadius: '7px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.78rem' }}>
-              💡 {lang === 'tr'
-                ? 'Henüz azınlık görüşü tespiti için yeterli gerekçeli görüş verisi yok.'
-                : 'No underrepresented strong arguments detected yet.'}
+            <div style={{ padding: '0.75rem', border: '1px dashed rgba(245, 158, 11, 0.25)', borderRadius: '7px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.78rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
+              <Info size={14} style={{ color: '#f59e0b' }} />
+              <span>
+                {lang === 'tr'
+                  ? 'Henüz azınlık görüşü tespiti için yeterli gerekçeli görüş verisi yok.'
+                  : 'No underrepresented strong arguments detected yet.'}
+              </span>
             </div>
           )}
         </div>

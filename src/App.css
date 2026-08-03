@@ -1176,6 +1176,7 @@ h1, h2, h3, h4, h5, h6 {
    ========================================================================== */
 
 /* 1. LIGHT THEME TOKENS (Default) */
+:root,
 [data-ui-mode="modern"] {
   --bg-main: #fafafa;
   --bg-card: #ffffff;
@@ -1227,10 +1228,9 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* 2. DARK THEME TOKENS */
-body.dark-theme [data-ui-mode="modern"],
+body.dark-theme,
 [data-ui-mode="modern"].dark-theme,
-[data-ui-mode="modern"] body.dark-theme,
-.dark-theme[data-ui-mode="modern"] {
+.dark-theme {
   --bg-main: #090d16;
   --bg-card: #111827;
   --bg-card-hover: #1f2937;

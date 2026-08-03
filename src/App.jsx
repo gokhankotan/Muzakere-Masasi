@@ -38,7 +38,10 @@ export default function App() {
   const [sessionsOverview, setSessionsOverview] = useState([]);
   const [lang, setLang] = useState(localStorage.getItem('muzakere_lang') || 'tr');
   const [theme, setTheme] = useState(localStorage.getItem('muzakere_theme') || 'light');
-  const [uiMode, setUiMode] = useState(localStorage.getItem('muzakere_ui_mode') || 'modern');
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-ui-mode', 'modern');
+  }, []);
 
   useEffect(() => {
     if (theme === 'dark') {
@@ -49,17 +52,8 @@ export default function App() {
     localStorage.setItem('muzakere_theme', theme);
   }, [theme]);
 
-  useEffect(() => {
-    document.documentElement.setAttribute('data-ui-mode', uiMode);
-    localStorage.setItem('muzakere_ui_mode', uiMode);
-  }, [uiMode]);
-
   const toggleTheme = () => {
     setTheme(prev => prev === 'light' ? 'dark' : 'light');
-  };
-
-  const toggleUiMode = () => {
-    setUiMode(prev => prev === 'modern' ? 'classic' : 'modern');
   };
 
   useEffect(() => {
@@ -660,20 +654,6 @@ export default function App() {
             >
               {theme === 'light' ? '🌙 Koyu' : '☀️ Açık'}
             </button>
-
-            {/* UI Modu Seçici (Swiss Bento vs Klasik) */}
-            <button
-              onClick={toggleUiMode}
-              className={`nav-btn ${uiMode === 'modern' ? 'active' : ''}`}
-              style={{
-                padding: '0.25rem 0.65rem',
-                fontSize: '0.75rem',
-                fontWeight: 600
-              }}
-              title={lang === 'tr' ? 'Tasarım Modunu Değiştir (Swiss Bento SaaS vs Klasik)' : 'Toggle UI Mode (Swiss Bento vs Classic)'}
-            >
-              {uiMode === 'modern' ? '✨ UI: Swiss Bento' : '🏛️ UI: Klasik'}
-            </button>
           </div>
         </div>
       </header>
@@ -748,6 +728,7 @@ export default function App() {
           <LiveScreen 
             question={sessionState.question}
             analysis={sessionState.analysis}
+            statements={sessionState.statements}
             stats={{
               participantsCount: sessionState.participantsCount,
               statementsCount: sessionState.statements.length
