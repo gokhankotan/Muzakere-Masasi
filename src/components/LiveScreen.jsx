@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Users, FileText, Split, CheckCircle2, AlertCircle, Shield, ListFilter, Info, BarChart2 } from 'lucide-react';
+import { Users, FileText, Split, CheckCircle2, AlertCircle, Shield, ListFilter, Info, BarChart2, Award, Sparkles } from 'lucide-react';
 import { t } from '../i18n';
 
 const getCampColor = (campId, totalCamps) => {
@@ -139,7 +139,7 @@ export default function LiveScreen({ question, analysis, stats, statements = [],
                 borderRadius: 'var(--radius-md)',
                 textAlign: 'center'
               }}>
-                <div style={{ fontSize: '2.5rem' }}>📊</div>
+                <BarChart2 size={36} style={{ color: 'var(--color-primary)', opacity: 0.8 }} />
                 <p style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--color-primary)' }}>
                   {lang === 'tr' ? 'Anlamlı analiz için daha fazla katılım gerekli' : 'More participation needed for meaningful analysis'}
                 </p>
@@ -276,7 +276,7 @@ export default function LiveScreen({ question, analysis, stats, statements = [],
                 fontSize: '0.76rem',
                 color: '#fbbf24'
               }}>
-                <span>⚠️</span>
+                <AlertCircle size={14} style={{ color: '#fbbf24' }} />
                 <span>
                   {lang === 'tr'
                     ? `Bu harita görüş çeşitliliğinin sınırlı bir kısmını yansıtıyor (%${Math.round(totalVariance * 100)})`
@@ -399,27 +399,37 @@ export default function LiveScreen({ question, analysis, stats, statements = [],
                   <div style={{ fontSize: '0.88rem', lineHeight: 1.45, marginBottom: '0.4rem' }}>
                     "{insight.text}"
                   </div>
-                  <div style={{ display: 'flex', gap: '0.65rem', fontSize: '0.74rem', color: 'var(--text-muted)', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: '0.65rem', fontSize: '0.74rem', color: 'var(--text-muted)', flexWrap: 'wrap', alignItems: 'center' }}>
                     <span style={{
                       background: 'rgba(245, 158, 11, 0.15)',
                       color: '#f59e0b',
                       padding: '0.12rem 0.45rem',
                       borderRadius: '4px',
-                      fontWeight: 600
+                      fontWeight: 600,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.3rem'
                     }}>
-                      🧠 {lang === 'tr' ? 'Gerekçe Kalitesi' : 'Quality'}: %{insight.qualityScore}
+                      <Award size={12} /> {lang === 'tr' ? 'Gerekçe Kalitesi' : 'Quality'}: %{insight.qualityScore}
                     </span>
-                    <span>🗳️ {insight.voteCount} {lang === 'tr' ? 'Oy' : 'Votes'}</span>
-                    <span>👍 %{insight.approvalRate ?? Math.round((insight.agreeCount / Math.max(1, insight.voteCount))*100)} {lang === 'tr' ? 'Onay' : 'Approval'}</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                      <Users size={12} /> {insight.voteCount} {lang === 'tr' ? 'Oy' : 'Votes'}
+                    </span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                      <CheckCircle2 size={12} /> %{insight.approvalRate ?? Math.round((insight.agreeCount / Math.max(1, insight.voteCount))*100)} {lang === 'tr' ? 'Onay' : 'Approval'}
+                    </span>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div style={{ padding: '0.85rem', border: '1px dashed rgba(245, 158, 11, 0.25)', borderRadius: '8px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-              💡 {lang === 'tr'
-                ? 'Henüz azınlık görüşü tespiti için yeterli gerekçeli görüş verisi oluşmadı.'
-                : 'No underrepresented strong arguments detected yet.'}
+            <div style={{ padding: '0.85rem', border: '1px dashed rgba(245, 158, 11, 0.25)', borderRadius: '8px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
+              <Info size={14} style={{ color: '#f59e0b' }} />
+              <span>
+                {lang === 'tr'
+                  ? 'Henüz azınlık görüşü tespiti için yeterli gerekçeli görüş verisi oluşmadı.'
+                  : 'No underrepresented strong arguments detected yet.'}
+              </span>
             </div>
           )}
         </div>
@@ -511,8 +521,8 @@ export default function LiveScreen({ question, analysis, stats, statements = [],
             <div className="bridge-list">
               {bridges.slice(0, 4).map((bridge, index) => (
                 <div key={bridge.id || index} className="bridge-accent-card">
-                  <div className="bridge-accent-badge">
-                    ⚡ {lang === 'tr' ? 'Köprü Görüş (Ortak Mutabakat)' : 'Bridge Statement (Consensus)'}
+                  <div className="bridge-accent-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <Sparkles size={13} /> {lang === 'tr' ? 'Köprü Görüş (Ortak Mutabakat)' : 'Bridge Statement (Consensus)'}
                   </div>
                   <div className="bridge-accent-text">
                     "{bridge.text}"
@@ -580,7 +590,7 @@ export default function LiveScreen({ question, analysis, stats, statements = [],
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
                 <FileText size={22} style={{ color: 'var(--color-secondary)' }} />
                 <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-main)', margin: 0 }}>
-                  {lang === 'tr' ? '📋 Oylamaya Açık Aktif Görüşler' : '📋 Active Voting Opinions'}
+                  {lang === 'tr' ? 'Oylamaya Açık Aktif Görüşler' : 'Active Voting Opinions'}
                 </h3>
                 <span style={{
                   background: 'rgba(37, 99, 235, 0.15)',

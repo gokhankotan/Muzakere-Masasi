@@ -174,7 +174,7 @@ export default function AdminDashboard({
     setSimStatus(lang === 'tr' ? `${count} bot simülasyonu başlatılıyor...` : `Starting ${count} bot simulation...`);
     onRunSimulation(count);
     setTimeout(() => {
-      setSimStatus(lang === 'tr' ? `✅ ${count} bot başarıyla eklendi ve oylama tamamlandı!` : `✅ ${count} bots successfully added!`);
+      setSimStatus(lang === 'tr' ? `${count} bot başarıyla eklendi ve oylama tamamlandı!` : `${count} bots successfully added!`);
     }, 2000);
   };
 
@@ -341,15 +341,15 @@ export default function AdminDashboard({
                 <div className="form-group" style={{ margin: 0 }}>
                   <label className="form-label">{lang === 'tr' ? 'Erişim Türü' : 'Access'}</label>
                   <select className="form-input" value={editVisibility} onChange={(e) => setEditVisibility(e.target.value)} style={{ background: 'var(--bg-card)', color: 'var(--text-main)' }}>
-                    <option value="PUBLIC">{lang === 'tr' ? '🌐 Herkese Açık' : '🌐 Public'}</option>
-                    <option value="PASSWORD_PROTECTED">{lang === 'tr' ? '🔒 Şifreli' : '🔒 Protected'}</option>
+                    <option value="PUBLIC">{lang === 'tr' ? 'Herkese Açık' : 'Public'}</option>
+                    <option value="PASSWORD_PROTECTED">{lang === 'tr' ? 'Şifreli' : 'Protected'}</option>
                   </select>
                 </div>
                 <div className="form-group" style={{ margin: 0 }}>
                   <label className="form-label">{lang === 'tr' ? 'Durum' : 'Status'}</label>
                   <select className="form-input" value={editStatus} onChange={(e) => setEditStatus(e.target.value)} style={{ background: 'var(--bg-card)', color: 'var(--text-main)' }}>
-                    <option value="active">{lang === 'tr' ? '▶️ Aktif' : '▶️ Active'}</option>
-                    <option value="paused">{lang === 'tr' ? '⏸️ Durduruldu' : '⏸️ Paused'}</option>
+                    <option value="active">{lang === 'tr' ? 'Aktif' : 'Active'}</option>
+                    <option value="paused">{lang === 'tr' ? 'Durduruldu' : 'Paused'}</option>
                   </select>
                 </div>
                 {editVisibility === 'PASSWORD_PROTECTED' && (
@@ -365,7 +365,7 @@ export default function AdminDashboard({
                   {lang === 'tr' ? 'Kapat' : 'Close'}
                 </button>
                 <button type="submit" className="btn" style={{ background: 'var(--color-primary)', minWidth: '160px' }}>
-                  {lang === 'tr' ? '💾 Değişiklikleri Kaydet' : '💾 Save Changes'}
+                  {lang === 'tr' ? 'Değişiklikleri Kaydet' : 'Save Changes'}
                 </button>
               </div>
             </form>
@@ -376,7 +376,7 @@ export default function AdminDashboard({
       {/* Meta-Analiz Tablosu — Sistem Yönetim Paneli'nin Hemen Altında */}
       <div className="glass-panel" style={{ width: '100%' }}>
         <h2 style={{ fontSize: '1.25rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          📊 {lang === 'tr' ? 'Oturumlar Arası Meta-Analiz' : 'Cross-Session Meta-Analysis'}
+          {lang === 'tr' ? 'Oturumlar Arası Meta-Analiz' : 'Cross-Session Meta-Analysis'}
         </h2>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
           {lang === 'tr'
@@ -416,7 +416,7 @@ export default function AdminDashboard({
                         }}
                         title={lang === 'tr' ? 'Yönetmek için bu oturumu seç' : 'Select this session to manage'}
                       >
-                        {s.code} {s.passwordText ? ` (${lang === 'tr' ? 'Şifre' : 'Pass'}: ${s.passwordText})` : ''} {activeSessionCode === s.code ? '⭐️' : ''}
+                        {s.code} {s.passwordText ? ` (${lang === 'tr' ? 'Şifre' : 'Pass'}: ${s.passwordText})` : ''} {activeSessionCode === s.code ? ' (Aktif)' : ''}
                       </button>
                     </td>
                     <td style={{ padding: '0.75rem', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={s.question}>{s.question}</td>
@@ -435,7 +435,7 @@ export default function AdminDashboard({
                       >
                         {editingSession && editingSession.code === s.code
                           ? (lang === 'tr' ? '✕ Kapat' : '✕ Close')
-                          : (lang === 'tr' ? '⚙️ Düzenle' : '⚙️ Edit')}
+                          : (lang === 'tr' ? 'Düzenle' : 'Edit')}
                       </button>
                     </td>
                   </tr>
@@ -457,7 +457,7 @@ export default function AdminDashboard({
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
           <div>
             <h2 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-              📈 {lang === 'tr' ? 'Kutuplaşma Trendi' : 'Polarization Trend'}
+              <TrendingUp size={20} className="text-secondary" /> {lang === 'tr' ? 'Kutuplaşma Trendi' : 'Polarization Trend'}
               <span style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid var(--border-light)', borderRadius: '999px', padding: '0.1rem 0.6rem', fontSize: '0.72rem', color: 'var(--color-secondary)', fontWeight: 600 }}>
                 {activeSessionCode}
               </span>
@@ -474,7 +474,7 @@ export default function AdminDashboard({
                 onChange={e => setShowSimulated(e.target.checked)}
                 style={{ cursor: 'pointer', accentColor: 'var(--color-secondary)' }}
               />
-              <span>🤖 {lang === 'tr' ? 'Simülasyon verilerini göster' : 'Show simulation data'}</span>
+              <span>{lang === 'tr' ? 'Simülasyon verilerini göster' : 'Show simulation data'}</span>
             </label>
             {/* Trend Badge */}
             {polarizationHistory.length >= 2 && (() => {
@@ -506,7 +506,7 @@ export default function AdminDashboard({
           const hist = showSimulated ? polarizationHistory : polarizationHistory.filter(pt => !pt.isSimulated);
           if (hist.length < 2) return (
             <div style={{ padding: '2.5rem 1rem', border: '1px dashed var(--border-light)', borderRadius: '8px', textAlign: 'center', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
-              <span style={{ fontSize: '2rem', opacity: 0.4 }}>📈</span>
+              <TrendingUp size={32} style={{ opacity: 0.4, color: 'var(--text-muted)' }} />
               <p style={{ fontSize: '0.85rem', fontWeight: 500 }}>
                 {lang === 'tr' ? 'Gösterilecek en az 2 gerçek katılımcı analiz kaydı gerekir.' : 'At least 2 real participant analysis snapshots required.'}
               </p>
