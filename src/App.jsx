@@ -164,6 +164,20 @@ export default function App() {
       setSessionState(prev => ({ ...prev, status }));
     });
 
+    socket.on('statement-deleted', ({ id }) => {
+      setSessionState(prev => ({
+        ...prev,
+        statements: prev.statements.filter(st => st.id !== id)
+      }));
+    });
+
+    socket.on('statement-edited', ({ statement }) => {
+      setSessionState(prev => ({
+        ...prev,
+        statements: prev.statements.map(st => st.id === statement.id ? statement : st)
+      }));
+    });
+
     socket.on('connect', () => {
       setIsConnected(true);
       
@@ -721,6 +735,7 @@ export default function App() {
             lang={lang}
             sessionsOverview={sessionsOverview}
             analysis={sessionState.analysis}
+            statements={sessionState.statements}
           />
         )}
 

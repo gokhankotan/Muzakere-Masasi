@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { HelpCircle, Users, Check, X, Settings, FileText, Play, Shield, AlertTriangle, RefreshCw, Send, Sparkles, TrendingUp, TrendingDown } from 'lucide-react';
+import { HelpCircle, Users, Check, X, Settings, FileText, Play, Shield, AlertTriangle, RefreshCw, Send, Sparkles, TrendingUp, TrendingDown, CheckCircle2 } from 'lucide-react';
 import { t } from '../i18n';
 
 export default function AdminDashboard({ 
@@ -26,7 +26,8 @@ export default function AdminDashboard({
   sessionsOverview = [],
   activeSessionCode = 'DEFAULT',
   onSelectSession,
-  analysis = null
+  analysis = null,
+  statements = []
 }) {
   const [newQuestion, setNewQuestion] = useState(question);
   const [simCount, setSimCount] = useState(100);
@@ -194,6 +195,56 @@ export default function AdminDashboard({
     setEditingCampName('');
   };
 
+  const [editingStatementId, setEditingStatementId] = useState(null);
+  const [editingStatementText, setEditingStatementText] = useState('');
+
+  const handleDeleteStatement = async (id) => {
+    if (!confirm(lang === 'tr' ? 'Bu görüşü kalıcı olarak silmek istediğinize emin misiniz?' : 'Are you sure you want to permanently delete this opinion?')) {
+      return;
+    }
+    const token = localStorage.getItem('admin_token');
+    try {
+      const res = await fetch(`/api/sessions/${activeSessionCode}/opinions/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(lang === 'tr' ? 'Görüş başarıyla silindi!' : 'Opinion successfully deleted!');
+        fetchActionLogs();
+      } else {
+        alert(data.message || (lang === 'tr' ? 'Silme işlemi başarısız.' : 'Delete failed.'));
+      }
+    } catch (err) {
+      alert(lang === 'tr' ? 'Bağlantı hatası oluştu.' : 'Connection error.');
+    }
+  };
+
+  const handleSaveStatementEdit = async (id) => {
+    if (!editingStatementText.trim()) return;
+    const token = localStorage.getItem('admin_token');
+    try {
+      const res = await fetch(`/api/sessions/${activeSessionCode}/opinions/${id}/text`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ text: editingStatementText.trim() })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setEditingStatementId(null);
+        setEditingStatementText('');
+        fetchActionLogs();
+      } else {
+        alert(data.message || (lang === 'tr' ? 'Güncelleme başarısız.' : 'Update failed.'));
+      }
+    } catch (err) {
+      alert(lang === 'tr' ? 'Bağlantı hatası oluştu.' : 'Connection error.');
+    }
+  };
+
   const handleResetAllData = () => {
     if (!confirm('TÜM veritabanını sıfırlamak ve varsayılan test verilerine dönmek istediğinize emin misiniz? Bu işlem geri alınamaz!')) {
       return;
@@ -268,6 +319,24 @@ export default function AdminDashboard({
       setDiscoveringConsensus(false);
     }
   };
+
+  // Filter approved/active statements for voting/management
+  const approvedStatements = statements.filter(st => st.approved !== false && st.status !== 'PENDING' && st.status !== 'REJECTED');
+
+  // Metrics map for fast lookup of live opinion metrics
+  const metricsMap = new Map((analysis?.allStatements || analysis?.statementMetrics || []).map(s => [s.id, s]));
+
+  // Sort statements by approvalRate descending, then voteCount descending
+  const sortedStatements = [...approvedStatements].sort((a, b) => {
+    const ma = metricsMap.get(a.id) || a;
+    const mb = metricsMap.get(b.id) || b;
+    const rateA = ma.approvalRate !== undefined ? ma.approvalRate : 0;
+    const rateB = mb.approvalRate !== undefined ? mb.approvalRate : 0;
+    if (rateB !== rateA) return rateB - rateA;
+    const votesA = ma.voteCount !== undefined ? ma.voteCount : 0;
+    const votesB = mb.voteCount !== undefined ? mb.voteCount : 0;
+    return votesB - votesA;
+  });
 
   return (
     <div className="admin-container" style={{ display: 'flex', flexDirection: 'column', gap: '2rem', maxWidth: '1200px', margin: '0 auto', padding: '0 1rem 3rem 1rem' }}>
@@ -1082,6 +1151,138 @@ export default function AdminDashboard({
               {t('adminQuestionUpdateBtn', lang)}
             </button>
           </form>
+        </div>
+
+        {/* Aktif Görüş Yönetimi Bento Kartı (Canlı Ekran Aktif Görüşler yapısının benzeri) */}
+        <div className="glass-panel">
+          <h2 style={{ fontSize: '1.25rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <FileText size={18} className="text-secondary" />
+            {lang === 'tr' ? 'Aktif Görüş Yönetimi' : 'Active Opinions Management'} ({sortedStatements.length})
+          </h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1rem' }}>
+            {lang === 'tr' 
+              ? 'Onaylanmış aktif görüşleri onay oranına göre sıralı görüntüleyin. Görüşleri silebilir veya metinlerini düzenleyebilirsiniz.' 
+              : 'View approved active opinions sorted by approval rate. You can delete or edit their text.'}
+          </p>
+
+          <div style={{ maxHeight: '420px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.85rem', paddingRight: '0.5rem' }}>
+            {sortedStatements.length > 0 ? (
+              sortedStatements.map((st, idx) => {
+                const metric = metricsMap.get(st.id) || st;
+                const voteCount = metric.voteCount !== undefined
+                  ? metric.voteCount
+                  : ((metric.agreeCount || 0) + (metric.disagreeCount || 0) + (metric.passCount || 0));
+                const agreeCount = metric.agreeCount || 0;
+                const approvalPct = metric.approvalRate !== undefined
+                  ? metric.approvalRate
+                  : (voteCount > 0 ? Math.round((agreeCount / Math.max(1, voteCount)) * 100) : 0);
+
+                const isEditing = editingStatementId === st.id;
+
+                return (
+                  <div key={st.id || idx} style={{
+                    padding: '1.1rem 1.35rem',
+                    background: 'var(--bg-main)',
+                    border: '1px solid var(--border-light)',
+                    borderLeft: '5px solid var(--color-secondary)',
+                    borderRadius: '10px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.6rem'
+                  }}>
+                    {isEditing ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        <textarea
+                          className="form-input"
+                          rows={3}
+                          value={editingStatementText}
+                          onChange={(e) => setEditingStatementText(e.target.value)}
+                          style={{ width: '100%', fontSize: '1rem', background: 'var(--bg-card)', color: 'var(--text-main)', padding: '0.5rem' }}
+                          maxLength={750}
+                        />
+                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                          <button
+                            onClick={() => handleSaveStatementEdit(st.id)}
+                            className="btn btn-agree"
+                            style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }}
+                          >
+                            {lang === 'tr' ? 'Kaydet' : 'Save'}
+                          </button>
+                          <button
+                            onClick={() => { setEditingStatementId(null); setEditingStatementText(''); }}
+                            className="btn btn-pass"
+                            style={{ padding: '0.35rem 0.5rem', fontSize: '0.8rem' }}
+                          >
+                            {lang === 'tr' ? 'Vazgeç' : 'Cancel'}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div style={{ fontSize: '1.08rem', fontWeight: 600, color: 'var(--text-main)', lineHeight: 1.5 }}>
+                          "{st.text}"
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+                          <div style={{ display: 'flex', gap: '0.85rem', flexWrap: 'wrap', alignItems: 'center', fontSize: '0.85rem' }}>
+                            <span style={{
+                              background: 'rgba(37, 99, 235, 0.12)',
+                              border: '1px solid rgba(37, 99, 235, 0.3)',
+                              color: 'var(--color-secondary)',
+                              padding: '0.2rem 0.65rem',
+                              borderRadius: '999px',
+                              fontWeight: 600,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.35rem'
+                            }}>
+                              <Users size={14} />
+                              {voteCount} {lang === 'tr' ? 'Oy' : 'Votes'}
+                            </span>
+
+                            <span style={{
+                              background: 'rgba(16, 185, 129, 0.12)',
+                              border: '1px solid rgba(16, 185, 129, 0.3)',
+                              color: '#10b981',
+                              padding: '0.2rem 0.65rem',
+                              borderRadius: '999px',
+                              fontWeight: 600,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.35rem'
+                            }}>
+                              <CheckCircle2 size={14} />
+                              %{approvalPct} {lang === 'tr' ? 'Onay' : 'Approval'}
+                            </span>
+                          </div>
+
+                          <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <button
+                              onClick={() => { setEditingStatementId(st.id); setEditingStatementText(st.text); }}
+                              className="btn btn-secondary"
+                              style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem', minWidth: 'auto', background: 'transparent', borderColor: 'var(--color-primary)', color: 'var(--color-primary)' }}
+                            >
+                              {lang === 'tr' ? 'Düzenle' : 'Edit'}
+                            </button>
+                            <button
+                              onClick={() => handleDeleteStatement(st.id)}
+                              className="btn btn-disagree"
+                              style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem', minWidth: 'auto', background: 'transparent', borderColor: 'var(--color-disagree)', color: 'var(--color-disagree)' }}
+                            >
+                              {lang === 'tr' ? 'Sil' : 'Delete'}
+                            </button>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })
+            ) : (
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontStyle: 'italic', textAlign: 'center', padding: '1rem 0' }}>
+                {lang === 'tr' ? 'Henüz oylamaya açılmış aktif görüş bulunmuyor.' : 'No active approved opinions available for voting yet.'}
+              </p>
+            )}
+          </div>
         </div>
 
         {/* 3. Aktif Katılımcılar Listesi */}

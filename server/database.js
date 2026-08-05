@@ -743,6 +743,92 @@ class Database {
     return null;
   }
 
+  deleteStatement(sessionCode, id) {
+    const session = this.sessions.get(sessionCode);
+    if (!session) return false;
+
+    // Search in active statements
+    const idx = session.statements.findIndex(s => s.id === id);
+    if (idx !== -1) {
+      const statement = session.statements.splice(idx, 1)[0];
+      this.logAdminAction(sessionCode, 'DELETE_OPINION', `Görüş silindi: "${statement.text.substring(0, 30)}..."`);
+      this.markSessionMutated(sessionCode, 'opinion');
+
+      if (this.isPrismaActive) {
+        this.prisma.opinion.delete({
+          where: { id }
+        }).catch(err => {
+          console.error('Opinion DB silme hatası:', err.message);
+        });
+      }
+      return true;
+    }
+
+    // Also search in moderation queue just in case
+    const modIdx = session.moderationQueue.findIndex(s => s.id === id);
+    if (modIdx !== -1) {
+      const statement = session.moderationQueue.splice(modIdx, 1)[0];
+      this.logAdminAction(sessionCode, 'DELETE_OPINION', `Kuyruktaki görüş silindi: "${statement.text.substring(0, 30)}..."`);
+      this.markSessionMutated(sessionCode, 'general');
+
+      if (this.isPrismaActive) {
+        this.prisma.opinion.delete({
+          where: { id }
+        }).catch(err => {
+          console.error('Opinion DB silme hatası:', err.message);
+        });
+      }
+      return true;
+    }
+
+    return false;
+  }
+
+  editStatementText(sessionCode, id, newText) {
+    const session = this.sessions.get(sessionCode);
+    if (!session) return null;
+
+    // Search in active statements
+    const statement = session.statements.find(s => s.id === id);
+    if (statement) {
+      const oldText = statement.text;
+      statement.text = newText.trim().substring(0, 750);
+      this.logAdminAction(sessionCode, 'EDIT_OPINION', `Görüş düzenlendi: "${oldText.substring(0, 15)}..." -> "${statement.text.substring(0, 15)}..."`);
+      this.markSessionMutated(sessionCode, 'opinion');
+
+      if (this.isPrismaActive) {
+        this.prisma.opinion.update({
+          where: { id },
+          data: { text: statement.text }
+        }).catch(err => {
+          console.error('Opinion DB güncelleme hatası:', err.message);
+        });
+      }
+      return statement;
+    }
+
+    // Also search in moderation queue
+    const modStatement = session.moderationQueue.find(s => s.id === id);
+    if (modStatement) {
+      const oldText = modStatement.text;
+      modStatement.text = newText.trim().substring(0, 750);
+      this.logAdminAction(sessionCode, 'EDIT_OPINION', `Kuyruktaki görüş düzenlendi: "${oldText.substring(0, 15)}..." -> "${modStatement.text.substring(0, 15)}..."`);
+      this.markSessionMutated(sessionCode, 'general');
+
+      if (this.isPrismaActive) {
+        this.prisma.opinion.update({
+          where: { id },
+          data: { text: modStatement.text }
+        }).catch(err => {
+          console.error('Opinion DB güncelleme hatası:', err.message);
+        });
+      }
+      return modStatement;
+    }
+
+    return null;
+  }
+
   updateSessionQuestion(sessionCode, newQuestion) {
     const session = this.sessions.get(sessionCode);
     if (!session) return;

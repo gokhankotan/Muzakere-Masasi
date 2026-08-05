@@ -461,6 +461,70 @@ app.patch('/api/sessions/:code/opinions/:id/status', requireSessionOwnership, as
   }
 });
 
+app.delete('/api/sessions/:code/opinions/:id', requireSessionOwnership, async (req, res) => {
+  const { code, id } = req.params;
+  const upperCode = code.toUpperCase();
+
+  try {
+    const success = db.deleteStatement(upperCode, id);
+    if (!success) {
+      return res.status(404).json({ success: false, message: 'Görüş bulunamadı.' });
+    }
+
+    const session = req.session;
+
+    // Send updated stats to all participants
+    io.to(`session-${upperCode}`).emit('stats-update', { 
+      participantsCount: session.participants.filter(p => !p.isBanned).length 
+    });
+
+    // Also broadcast updated moderation queue to admins
+    io.to(`moderator-${upperCode}`).emit('moderation-queue', session.moderationQueue);
+
+    // Let the room know a statement was deleted (so they can drop it from state)
+    io.to(`session-${upperCode}`).emit('statement-deleted', { id });
+
+    // Rerun analysis
+    runAndBroadcastAnalysis(upperCode, 'deleteStatement');
+
+    res.json({ success: true, message: 'Görüş başarıyla silindi.' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.patch('/api/sessions/:code/opinions/:id/text', requireSessionOwnership, async (req, res) => {
+  const { code, id } = req.params;
+  const { text } = req.body;
+  const upperCode = code.toUpperCase();
+
+  if (!text || !text.trim()) {
+    return res.status(400).json({ success: false, message: 'Görüş metni boş olamaz.' });
+  }
+
+  try {
+    const statement = db.editStatementText(upperCode, id, text);
+    if (!statement) {
+      return res.status(404).json({ success: false, message: 'Görüş bulunamadı.' });
+    }
+
+    const session = req.session;
+
+    // Broadcast updated moderation queue to admins
+    io.to(`moderator-${upperCode}`).emit('moderation-queue', session.moderationQueue);
+
+    // Let the room know a statement was edited
+    io.to(`session-${upperCode}`).emit('statement-edited', { statement });
+
+    // Rerun analysis
+    runAndBroadcastAnalysis(upperCode, 'editStatement');
+
+    res.json({ success: true, statement });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // 8. Sonuç Raporu (JSON)
 app.get('/api/sessions/:code/report', checkParticipantAccess, async (req, res) => {
   const { code } = req.params;
